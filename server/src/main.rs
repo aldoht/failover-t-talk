@@ -4,6 +4,7 @@ use tower_http::{cors::{CorsLayer, Any}};
 use prometheus::{Counter, Encoder, TextEncoder, register_counter};
 use serde::Serialize;
 use tokio::net::TcpListener;
+mod db;
 
 lazy_static::lazy_static! {
     static ref REQUEST_COUNTER: Counter = register_counter!(
@@ -20,6 +21,13 @@ struct StatusResponse {
 #[tokio::main]
 async fn main() {
     dotenvy::dotenv().ok();
+    let db_pool = db::create_db_pool().await;
+    
+    let users = db::get_users(&db_pool).await;
+    println!("{:#?}", users);
+    
+    let new_user = db::create_user(&db_pool, "Aldo".into(), "mnStrR".into(), "test321@somemail.com".into(), "test123".into()).await;
+    println!("{:#?}", new_user);
 
     let port: u16 = std::env::var("PORT")
         .unwrap_or("8080".into())
