@@ -1,6 +1,9 @@
-use prometheus::{Counter, register_counter, Encoder, TextEncoder};
-use tokio::net::{TcpListener};
-use axum::{routing::{get}, Router};
+use axum::{Json, Router, routing::get};
+use tower::ServiceBuilder;
+use tower_http::{cors::{CorsLayer, Any}};
+use prometheus::{Counter, Encoder, TextEncoder, register_counter};
+use serde::Serialize;
+use tokio::net::TcpListener;
 
 lazy_static::lazy_static! {
     static ref REQUEST_COUNTER: Counter = register_counter!(
@@ -8,10 +11,16 @@ lazy_static::lazy_static! {
     ).unwrap();
 }
 
+#[derive(Serialize)]
+struct StatusResponse {
+    status: String,
+    instance: String,
+}
+
 #[tokio::main]
 async fn main() {
-    dotenvy::dotenv().expect("Could not load env file.");
-    
+    dotenvy::dotenv().ok();
+
     let port: u16 = std::env::var("PORT")
         .unwrap_or("8080".into())
         .parse()
@@ -20,12 +29,27 @@ async fn main() {
         .unwrap_or("127.0.0.1".into())
         .parse()
         .unwrap();
+    let cors: CorsLayer = CorsLayer::new()
+        .allow_methods(Any)
+        .allow_headers(Any)
+        .allow_origin(Any);
+    let middleware = ServiceBuilder::new()
+        .layer(cors);
     let app: Router = Router::new()
         .route("/", get(root))
         .route("/health", get(health))
-        .route("/metrics", get(metrics));
+        .route("/metrics", get(metrics))
+        .route("/api/status", get(api_status))
+        .layer(middleware);
     let listener: TcpListener = TcpListener::bind(format!("{host}:{port}")).await.unwrap();
     axum::serve(listener, app).await.unwrap();
+}
+
+async fn api_status() -> Json<StatusResponse> {
+    Json(StatusResponse {
+        status: "running".into(),
+        instance: std::env::var("HOSTNAME").unwrap_or("unknown".into()),
+    })
 }
 
 async fn root() -> String {
@@ -34,7 +58,9 @@ async fn root() -> String {
     format!("Hello from instance: {hostname}")
 }
 
-async fn health() -> &'static str { "Ok" }
+async fn health() -> &'static str {
+    "Ok"
+}
 
 async fn metrics() -> String {
     let encoder = TextEncoder::new();
