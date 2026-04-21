@@ -6,7 +6,8 @@ pub struct UserRecord {
     pub name: String,
     pub tag: String,
     pub email: String,
-    pub password: String
+    pub password: String,
+    pub is_admin: bool,
 }
 
 pub async fn create_db_pool() -> PgPool {
@@ -18,10 +19,25 @@ pub async fn get_users(db_pool: &PgPool) -> anyhow::Result<Vec<UserRecord>> {
     let rec: Vec<UserRecord> = sqlx::query_as!(
         UserRecord,
         r#"
-        SELECT user_id, name, tag, email, password FROM users
+        SELECT user_id, name, tag, email, password, is_admin FROM users
         "#
     )
     .fetch_all(db_pool)
+    .await?;
+    
+    Ok(rec)
+}
+
+pub async fn get_user_by_email(db_pool: &PgPool, email: &String) -> anyhow::Result<UserRecord> {
+    let rec: UserRecord = sqlx::query_as!(
+        UserRecord,
+        r#"
+        SELECT user_id, name, tag, email, password, is_admin FROM users AS u
+        WHERE u.email = $1;
+        "#,
+        email
+    )
+    .fetch_one(db_pool)
     .await?;
     
     Ok(rec)
@@ -33,7 +49,7 @@ pub async fn create_user(db_pool: &PgPool, name: String, tag: String, email: Str
         r#"
         INSERT INTO users (name, tag, email, password)
         VALUES ($1, $2, $3, $4)
-        RETURNING user_id, name, tag, email, password;
+        RETURNING user_id, name, tag, email, password, is_admin;
         "#,
         name,
         tag,

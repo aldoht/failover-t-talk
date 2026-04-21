@@ -1,10 +1,13 @@
-use axum::{Json, Router, routing::get};
+use axum::{Json, Router, extract::State, routing::{get, post}};
 use tower::ServiceBuilder;
 use tower_http::{cors::{CorsLayer, Any}};
 use prometheus::{Counter, Encoder, TextEncoder, register_counter};
 use serde::Serialize;
 use tokio::net::TcpListener;
+
+use crate::auth::{LoginRequest, login};
 mod db;
+mod auth;
 
 lazy_static::lazy_static! {
     static ref REQUEST_COUNTER: Counter = register_counter!(
@@ -48,7 +51,9 @@ async fn main() {
         .route("/health", get(health))
         .route("/metrics", get(metrics))
         .route("/api/status", get(api_status))
-        .layer(middleware);
+        .route("/login", post(auth::login))
+        .layer(middleware)
+        .with_state(db_pool.clone());
     let listener: TcpListener = TcpListener::bind(format!("{host}:{port}")).await.unwrap();
     axum::serve(listener, app).await.unwrap();
 }
