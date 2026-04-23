@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n        SELECT user_id, name, tag, email, password, is_admin FROM users\n        ",
+  "query": "\n        INSERT INTO users (name, tag, email, password)\n        VALUES ($1, $2, $3, $4)\n        RETURNING user_id, name, tag, email, password, is_admin\n        ",
   "describe": {
     "columns": [
       {
@@ -35,7 +35,12 @@
       }
     ],
     "parameters": {
-      "Left": []
+      "Left": [
+        "Varchar",
+        "Varchar",
+        "Varchar",
+        "Varchar"
+      ]
     },
     "nullable": [
       false,
@@ -46,5 +51,5 @@
       false
     ]
   },
-  "hash": "cbf79d5857837b0af28da47cf0ff807a61dac413f2c2af40939f4fb857391c48"
+  "hash": "3262867e1d646cc6b0b3cd001cf032f5ee0528e797b3eba28c07e28cb09ded68"
 }
