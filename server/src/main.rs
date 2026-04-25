@@ -47,6 +47,7 @@ async fn main() {
         .route("/health", get(health))
         .route("/metrics", get(metrics))
         .route("/api/status", get(api_status))
+        .route("/signup", post(auth::signup))
         .route("/login", post(auth::login))
         .route("/users/{tag}", get(endpoints::user_by_tag))
         .layer(middleware)
