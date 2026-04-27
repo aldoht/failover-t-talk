@@ -75,6 +75,20 @@ fn validate_token(token: String) -> Result<Claims, Error> {
     Ok(data.claims)
 }
 
+pub fn extract_token(headers: &HeaderMap) -> Result<Claims, (StatusCode, &'static str)> {
+    let auth_header = headers
+        .get("Authorization")
+        .and_then(|v| v.to_str().ok())
+        .ok_or((StatusCode::UNAUTHORIZED, "Missing Authorization header."))?;
+    
+    let token = auth_header
+        .strip_prefix("Bearer ")
+        .ok_or((StatusCode::UNAUTHORIZED, "Invalid Authorization format."))?;
+    
+    validate_token(token.into())
+        .map_err(|_| (StatusCode::UNAUTHORIZED, "Invalid or expired token."))
+}
+
 pub fn extract_claims(headers: &HeaderMap) -> Result<Claims, String> {
     let auth_header = headers
         .get("Authorization")
