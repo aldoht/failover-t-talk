@@ -1,6 +1,6 @@
 use chrono::NaiveDate;
 use serde::Serialize;
-use sqlx::{PgPool};
+use sqlx::PgPool;
 
 #[derive(Debug, Serialize)]
 pub struct UserRecord {
@@ -20,9 +20,19 @@ pub struct PostRecord {
     pub creation_date: NaiveDate,
 }
 
+#[derive(Debug, Serialize)]
+pub struct MediaRecord {
+    pub media_id: uuid::Uuid,
+    pub url: String,
+    pub post_id: Option<uuid::Uuid>,
+    pub comment_id: Option<uuid::Uuid>,
+}
+
 pub async fn create_db_pool() -> PgPool {
     let url = std::env::var("AWS_PSQL_URL").expect("Database URL not set.");
-    PgPool::connect(&url).await.expect("Failed to connect to database.")
+    PgPool::connect(&url)
+        .await
+        .expect("Failed to connect to database.")
 }
 
 pub async fn get_users(db_pool: &PgPool) -> anyhow::Result<Vec<UserRecord>> {
@@ -34,7 +44,7 @@ pub async fn get_users(db_pool: &PgPool) -> anyhow::Result<Vec<UserRecord>> {
     )
     .fetch_all(db_pool)
     .await?;
-    
+
     Ok(rec)
 }
 
@@ -49,7 +59,7 @@ pub async fn get_user_by_email(db_pool: &PgPool, email: &String) -> anyhow::Resu
     )
     .fetch_one(db_pool)
     .await?;
-    
+
     Ok(rec)
 }
 
@@ -64,11 +74,17 @@ pub async fn get_user_by_tag(db_pool: &PgPool, tag: &String) -> anyhow::Result<U
     )
     .fetch_one(db_pool)
     .await?;
-    
+
     Ok(rec)
 }
 
-pub async fn create_user(db_pool: &PgPool, name: &String, tag: &String, email: &String, password: &String) -> anyhow::Result<UserRecord> {
+pub async fn create_user(
+    db_pool: &PgPool,
+    name: &String,
+    tag: &String,
+    email: &String,
+    password: &String,
+) -> anyhow::Result<UserRecord> {
     let rec: UserRecord = sqlx::query_as!(
         UserRecord,
         r#"
@@ -83,47 +99,83 @@ pub async fn create_user(db_pool: &PgPool, name: &String, tag: &String, email: &
     )
     .fetch_one(db_pool)
     .await?;
-    
+
     Ok(rec)
 }
 
-pub async fn create_post(db_pool: &PgPool, user_id: &String, text: &String) -> anyhow::Result<String> {
-    let rec: String = sqlx::query_as!(
-        String,
+pub async fn create_media(
+    db_pool: &PgPool,
+    url: String,
+    post_id: Option<uuid::Uuid>,
+    comment_id: Option<uuid::Uuid>,
+) -> anyhow::Result<MediaRecord> {
+    let rec = match post_id {
+        Some(id) => sqlx::query_as!(
+            MediaRecord,
+            r#"
+            INSERT INTO media (url, post_id)
+            VALUES ($1, $2)
+            RETURNING media_id, url, post_id, comment_id
+            "#,
+            url,
+            id,
+        )
+        .fetch_one(db_pool)
+        .await?,
+        None => sqlx::query_as!(
+            MediaRecord,
+            r#"
+            INSERT INTO media (url, post_id)
+            VALUES ($1, $2)
+            RETURNING media_id, url, post_id, comment_id
+            "#,
+            url,
+            comment_id.expect("Err"),
+        )
+        .fetch_one(db_pool)
+        .await?,
+    };
+
+    Ok(rec)
+}
+
+pub async fn create_post(
+    db_pool: &PgPool,
+    user_id: &uuid::Uuid,
+    text: &String,
+) -> anyhow::Result<PostRecord> {
+    let rec: PostRecord = sqlx::query_as!(
+        PostRecord,
         r#"
         INSERT INTO posts (user_id, text)
         VALUES ($1, $2)
-        RETURNING post_id, user_id, text, 
+        RETURNING post_id, user_id, text, creation_date
         "#,
         user_id,
         text,
     )
     .fetch_one(db_pool)
     .await?;
-    
+
     Ok(rec)
 }
 
 pub async fn check_exists_email(db_pool: &PgPool, email: &String) -> anyhow::Result<bool> {
-    let exists: bool = sqlx::query_scalar!(
-        "SELECT EXISTS(SELECT 1 FROM users WHERE email = $1)",
-        email
-    )
-    .fetch_one(db_pool)
-    .await?
-    .unwrap_or(false);
-    
+    let exists: bool =
+        sqlx::query_scalar!("SELECT EXISTS(SELECT 1 FROM users WHERE email = $1)", email)
+            .fetch_one(db_pool)
+            .await?
+            .unwrap_or(false);
+
     Ok(exists)
 }
 
 pub async fn check_exists_tag(db_pool: &PgPool, tag: &String) -> anyhow::Result<bool> {
-    let exists: bool = sqlx::query_scalar!(
-        "SELECT EXISTS(SELECT 1 FROM users WHERE tag = $1)",
-        tag
-    )
-    .fetch_one(db_pool)
-    .await?
-    .unwrap_or(false);
-    
+    let exists: bool =
+        sqlx::query_scalar!("SELECT EXISTS(SELECT 1 FROM users WHERE tag = $1)", tag)
+            .fetch_one(db_pool)
+            .await?
+            .unwrap_or(false);
+
     Ok(exists)
 }

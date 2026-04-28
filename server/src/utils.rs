@@ -31,3 +31,8 @@ pub fn valid_tag(tag: &str) -> bool {
 pub fn valid_name(name: &str) -> bool {
     !name.is_empty() && name.chars().count() <= 30 && RE_NAME.is_match(name)
 }
+
+// Max 500 chars
+pub fn valid_url(url: &str) -> bool {
+    !url.is_empty() && url.chars().count() <= 500
+}

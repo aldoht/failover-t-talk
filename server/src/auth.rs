@@ -21,9 +21,9 @@ use crate::{
 
 #[derive(Serialize, Deserialize)]
 pub struct Claims {
-    pub subject: String,
+    pub sub: String,
     pub is_admin: bool,
-    pub expiration: usize,
+    pub exp: usize,
 }
 
 #[derive(Deserialize)]
@@ -46,15 +46,15 @@ pub struct LoginResponse {
 }
 
 fn generate_token(user_uuid: &String, is_admin: &bool) -> String {
-    let expiration: usize = chrono::Utc::now()
+    let exp: usize = chrono::Utc::now()
         .checked_add_days(chrono::Days::new(1))
         .unwrap()
         .timestamp() as usize;
 
     let claims = Claims {
-        subject: user_uuid.clone(),
+        sub: user_uuid.clone(),
         is_admin: is_admin.clone(),
-        expiration,
+        exp,
     };
 
     encode(
