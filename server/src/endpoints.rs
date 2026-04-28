@@ -24,6 +24,11 @@ pub struct PostRequest {
     pub url: Option<String>,
 }
 
+#[derive(Deserialize)]
+pub struct FollowRequest {
+    pub follows_tag: String,
+}
+
 pub async fn user_by_tag(State(db_pool): State<PgPool>, Path(tag): Path<String>) -> impl IntoResponse + Debug {
     let user = get_user_by_tag(&db_pool, &tag).await;
     
@@ -65,6 +70,32 @@ pub async fn create_post(State(db_pool): State<PgPool>, headers: HeaderMap, Json
         None => {},
     };
     
-    (StatusCode::OK, "Created post successfully.").into_response()
+    (StatusCode::OK, "Created post successfully.").into_response()   
+}
+
+pub async fn follow_user(State(db_pool): State<PgPool>, headers: HeaderMap, Json(body): Json<FollowRequest>) -> impl IntoResponse + Debug {
+    let claims: Claims = match extract_token(&headers) {
+        Ok(c) => c,
+        Err(e) => return e.into_response(),
+    };
+    let user_id: uuid::Uuid = match uuid::Uuid::parse_str(&claims.sub[..]) {
+        Ok(id) => id,
+        Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR, "Could not retrieve user's ID.").into_response(),
+    };
+    let user_follows = get_user_by_tag(&db_pool, &body.follows_tag).await;
     
+    let user_follows = match user_follows {
+        Ok(u) => {
+            if u.user_id == user_id {
+                return (StatusCode::BAD_REQUEST, "Users can't follow themselves").into_response();
+            }
+            u
+        },
+        Err(_) => return (StatusCode::NOT_FOUND, "User with tag not found.").into_response(),
+    };
+    
+    match db::create_follow(&db_pool, &user_id, &user_follows.user_id).await {
+        Ok(_) => (StatusCode::OK, "Created follow successfully.").into_response(),
+        Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, "Error while creating follow in database.").into_response(),
+    }
 }

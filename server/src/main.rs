@@ -50,7 +50,8 @@ async fn main() {
         .route("/signup", post(auth::signup))
         .route("/login", post(auth::login))
         .route("/users/{tag}", get(endpoints::user_by_tag))
-        .route("/posts/", post(endpoints::create_post))
+        .route("/posts", post(endpoints::create_post))
+        .route("/follow", post(endpoints::follow_user))
         .layer(middleware)
         .with_state(db_pool);
     let listener: TcpListener = TcpListener::bind(format!("{host}:{port}")).await.unwrap();

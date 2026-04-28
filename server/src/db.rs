@@ -28,6 +28,13 @@ pub struct MediaRecord {
     pub comment_id: Option<uuid::Uuid>,
 }
 
+#[derive(Debug, Serialize)]
+pub struct FollowersRecord {
+    pub follow_id: uuid::Uuid,
+    pub followed_id: uuid::Uuid,
+    pub follows_id: uuid::Uuid,
+}
+
 pub async fn create_db_pool() -> PgPool {
     let url = std::env::var("AWS_PSQL_URL").expect("Database URL not set.");
     PgPool::connect(&url)
@@ -157,6 +164,23 @@ pub async fn create_post(
     .fetch_one(db_pool)
     .await?;
 
+    Ok(rec)
+}
+
+pub async fn create_follow(db_pool: &PgPool, followed_id: &uuid::Uuid, follows_id: &uuid::Uuid) -> anyhow::Result<FollowersRecord> {
+    let rec: FollowersRecord = sqlx::query_as!(
+        FollowersRecord,
+        r#"
+        INSERT INTO followers (followed_id, follows_id)
+        VALUES ($1, $2)
+        RETURNING follow_id, followed_id, follows_id
+        "#,
+        followed_id,
+        follows_id,
+    )
+    .fetch_one(db_pool)
+    .await?;
+    
     Ok(rec)
 }
 
