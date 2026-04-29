@@ -33,7 +33,7 @@ async fn main() {
         .parse()
         .unwrap();
     let host: String = std::env::var("HOST")
-        .unwrap_or("127.0.0.1".into())
+        .unwrap_or("0.0.0.0".into())
         .parse()
         .unwrap();
     let cors: CorsLayer = CorsLayer::new()
