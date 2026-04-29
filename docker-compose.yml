@@ -6,13 +6,18 @@ services:
     volumes:
       - "./nginx.conf:/etc/nginx/nginx.conf:ro"
     depends_on:
-      app:
+      app1:
+        condition: service_healthy
+      app2:
+        condition: service_healthy
+      app3:
         condition: service_healthy
     networks:
       - internal
 
-  app:
+  app1:
     build: ./server/
+    hostname: app1
     environment:
       PORT: ${PORT}
       HOST: ${HOST}
@@ -24,8 +29,40 @@ services:
       interval: 10s
       timeout: 3s
       retries: 3
-    deploy:
-      replicas: 3
+    networks:
+      - internal
+
+  app2:
+    build: ./server/
+    hostname: app2
+    environment:
+      PORT: ${PORT}
+      HOST: ${HOST}
+      HOSTNAME: ${HOSTNAME}
+      DATABASE_URL: ${AWS_PSQL_URL}
+      AWS_PSQL_URL: ${AWS_PSQL_URL}
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+    networks:
+      - internal
+
+  app3:
+    build: ./server/
+    hostname: app3
+    environment:
+      PORT: ${PORT}
+      HOST: ${HOST}
+      HOSTNAME: ${HOSTNAME}
+      DATABASE_URL: ${AWS_PSQL_URL}
+      AWS_PSQL_URL: ${AWS_PSQL_URL}
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
     networks:
       - internal
 
@@ -46,6 +83,8 @@ services:
   prometheus:
     image: prom/prometheus
     restart: unless-stopped
+    ports:
+      - "127.0.0.1:9090:9090"
     volumes:
       - "./prometheus.yml:/etc/prometheus/prometheus.yml:ro"
       - "./data/prometheus:/prometheus"
