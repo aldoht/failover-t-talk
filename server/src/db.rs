@@ -85,6 +85,25 @@ pub async fn get_user_by_tag(db_pool: &PgPool, tag: &String) -> anyhow::Result<U
     Ok(rec)
 }
 
+pub async fn get_user_follows(db_pool: &PgPool, tag: &String) -> anyhow::Result<Vec<UserRecord>> {
+    let user: UserRecord = get_user_by_tag(db_pool, tag).await?;
+    
+    let recs: Vec<UserRecord> = sqlx::query_as!(
+        UserRecord,
+        r#"
+        SELECT user_id, name, tag, email, password, is_admin
+        FROM users AS u
+        INNER JOIN followers AS f ON f.follows_id = u.user_id
+        WHERE f.followed_id = $1
+        "#,
+        user.user_id
+    )
+    .fetch_all(db_pool)
+    .await?;
+
+    Ok(recs)
+}
+
 pub async fn create_user(
     db_pool: &PgPool,
     name: &String,

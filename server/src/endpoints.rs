@@ -5,7 +5,7 @@ use reqwest::StatusCode;
 use serde::{Deserialize, Serialize};
 use sqlx::{PgPool};
 
-use crate::{auth::{Claims, extract_token}, db::{self, get_user_by_tag}, utils};
+use crate::{auth::{Claims, extract_token}, db::{self, get_user_by_tag, get_user_follows}, utils};
 
 #[derive(Debug, Serialize)]
 pub struct UserResponse {
@@ -73,6 +73,7 @@ pub async fn create_post(State(db_pool): State<PgPool>, headers: HeaderMap, Json
     (StatusCode::OK, "Created post successfully.").into_response()   
 }
 
+// Check if user already follows target
 pub async fn follow_user(State(db_pool): State<PgPool>, headers: HeaderMap, Json(body): Json<FollowRequest>) -> impl IntoResponse + Debug {
     let claims: Claims = match extract_token(&headers) {
         Ok(c) => c,
@@ -98,4 +99,24 @@ pub async fn follow_user(State(db_pool): State<PgPool>, headers: HeaderMap, Json
         Ok(_) => (StatusCode::OK, "Created follow successfully.").into_response(),
         Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, "Error while creating follow in database.").into_response(),
     }
+}
+
+pub async fn user_follows(State(db_pool): State<PgPool>, Path(tag): Path<String>) -> impl IntoResponse + Debug {
+    let user_following = get_user_follows(&db_pool, &tag).await;
+
+    let users: Vec<UserResponse> = match user_following {
+        Ok(users) => {
+            let mut response: Vec<UserResponse> = Vec::new();
+            for user in users.iter() {
+                response.push(UserResponse {
+                    name: user.name.clone(),
+                    tag: user.tag.clone(),
+                });
+            };
+            response
+        },
+        Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR, "Error while getting user's follows.").into_response(),
+    };
+
+    Json(users).into_response()
 }

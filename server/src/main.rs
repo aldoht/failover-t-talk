@@ -50,6 +50,7 @@ async fn main() {
         .route("/signup", post(auth::signup))
         .route("/login", post(auth::login))
         .route("/users/{tag}", get(endpoints::user_by_tag))
+        .route("/users/{tag}/following", get(endpoints::user_follows))
         .route("/posts", post(endpoints::create_post))
         .route("/follow", post(endpoints::follow_user))
         .layer(middleware)
