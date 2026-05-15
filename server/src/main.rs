@@ -54,6 +54,7 @@ async fn main() {
         .route("/follow", post(endpoints::users::follow_user))
         .route("/posts", post(endpoints::posts::create_post))
         .route("/posts/{tag}", get(endpoints::posts::get_posts_by_tag))
+        .route("/posts/{id}", get(endpoints::posts::get_post_by_id))
         .layer(middleware)
         .with_state(db_pool);
     let listener: TcpListener = TcpListener::bind(format!("{host}:{port}")).await.unwrap();

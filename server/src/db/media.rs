@@ -53,7 +53,7 @@ pub async fn create_media(
 pub async fn get_media_by_post_id(
     db_pool: &PgPool,
     post_id: &Uuid,
-) -> anyhow::Result<Vec<MediaRecord>> {
+) -> Result<Vec<MediaRecord>, sqlx::Error> {
     let rec = sqlx::query_as!(
         MediaRecord,
         r#"

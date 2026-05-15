@@ -1,5 +1,6 @@
 use serde::Serialize;
 use sqlx::PgPool;
+use uuid::Uuid;
 
 #[derive(Debug, Serialize)]
 pub struct UserRecord {
@@ -41,6 +42,21 @@ pub async fn get_user_by_email(db_pool: &PgPool, email: &String) -> anyhow::Resu
         WHERE u.email = $1;
         "#,
         email
+    )
+    .fetch_one(db_pool)
+    .await?;
+
+    Ok(rec)
+}
+
+pub async fn get_user_by_id(db_pool: &PgPool, id: Uuid) -> anyhow::Result<UserRecord> {
+    let rec: UserRecord = sqlx::query_as!(
+        UserRecord,
+        r#"
+        SELECT user_id, name, tag, email, password, is_admin, profile_picture_url, bio FROM users AS u
+        WHERE u.user_id = $1;
+        "#,
+        id
     )
     .fetch_one(db_pool)
     .await?;

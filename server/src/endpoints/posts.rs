@@ -1,6 +1,6 @@
 use std::fmt::Debug;
 
-use axum::{Json, extract::{Path, State}, http::HeaderMap, response::IntoResponse};
+use axum::{Json, extract::{Path, State}, http::HeaderMap, response::{IntoResponse, Response}};
 use chrono::{DateTime, Utc};
 use reqwest::StatusCode;
 use serde::{Deserialize, Serialize};
@@ -87,67 +87,90 @@ pub async fn create_post(
     (StatusCode::OK, "Created post successfully.").into_response()
 }
 
-fn handle_post_media(media: Vec<MediaRecord>, response: &mut Vec<PostResponse>, post: &PostRecord, user: &UserRecord, likes: i64) -> () {
+fn handle_post_media(media: Vec<MediaRecord>) -> Option<Vec<String>> {
     if media.is_empty() {
-        response.push(PostResponse {
-            post_id: post.post_id,
-            user_name: user.name.clone(),
-            user_tag: user.tag.clone(),
-            user_profile_pic_url: user.profile_picture_url.clone(),
-            text: post.text.clone(),
-            created_at: post.created_at,
-            media_urls: None,
-            like_count: likes,
-        });
+        None
     } else {
         let mut media_urls: Vec<String> = Vec::new();
         for m in media.iter() {
             media_urls.push(m.url.clone());
         }
-        response.push(PostResponse {
+        Some(media_urls)
+    }
+}
+
+async fn create_post_response(
+    post: &PostRecord,
+    user: &UserRecord,
+    db_pool: &PgPool
+) -> Result<PostResponse, sqlx::Error> {
+    let like_count = db::posts::get_post_like_count(&db_pool, &post.post_id)
+        .await
+        .unwrap_or(0);
+    
+    let media = db::media::get_media_by_post_id(db_pool, &post.post_id).await?;
+    let media_urls = handle_post_media(media);
+    
+    Ok(
+        PostResponse {
             post_id: post.post_id,
             user_name: user.name.clone(),
             user_tag: user.tag.clone(),
             user_profile_pic_url: user.profile_picture_url.clone(),
             text: post.text.clone(),
             created_at: post.created_at,
-            media_urls: Some(media_urls),
-            like_count: likes,
-        });
-    };
+            media_urls,
+            like_count,
+        }
+    )
 }
 
 pub async fn get_posts_by_tag(
     State(db_pool): State<PgPool>,
     Path(tag): Path<String>,
-) -> impl IntoResponse + Debug {
+) -> Result<Response, (StatusCode, &'static str)> {
     let user = db::users::get_user_by_tag(&db_pool, &tag).await;
     let user: db::users::UserRecord = match user {
         Ok(u) => u,
-        Err(_) => { return (StatusCode::NOT_FOUND, "User with tag not found.").into_response(); }
+        Err(_) => return Err((StatusCode::NOT_FOUND, "User with tag not found.")),
     };
-    
+
     let posts = db::posts::get_posts_by_tag(&db_pool, &tag).await;
     let posts: Vec<PostResponse> = match posts {
         Ok(posts) => {
             let mut response: Vec<PostResponse> = Vec::new();
             for post in posts.iter() {
-                let likes = match db::posts::get_post_like_count(&db_pool, &post.post_id).await {
-                    Ok(count) => count,
-                    Err(_) => 0
-                };
-                
-                match db::media::get_media_by_post_id(&db_pool, &post.post_id).await {
-                    Ok(media) => {
-                        handle_post_media(media, &mut response, post, &user, likes);
-                    },
-                    Err(_) => { return (StatusCode::INTERNAL_SERVER_ERROR, "Could not load media.").into_response(); }
-                };
-            };
+                let pr = create_post_response(post, &user, &db_pool)
+                    .await
+                    .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, "Could not load media."))?;
+                response.push(pr);
+            }
             response
-        },
-        Err(_) => { return (StatusCode::INTERNAL_SERVER_ERROR, "Could not load posts.").into_response(); }
+        }
+        Err(_) => return Err((StatusCode::INTERNAL_SERVER_ERROR, "Could not load posts.")),
     };
 
-    Json(posts).into_response()
+    Ok(Json(posts).into_response())
+}
+
+pub async fn get_post_by_id(
+    State(db_pool): State<PgPool>,
+    Path(id): Path<Uuid>,
+) -> Result<Response, (StatusCode, &'static str)> {
+    let post = db::posts::get_post_by_id(&db_pool, id)
+        .await
+        .map_err(|e| match e {
+            sqlx::Error::RowNotFound => (StatusCode::NOT_FOUND, "Post not found."),
+            _ => (StatusCode::INTERNAL_SERVER_ERROR, "Could not load post."),
+        })?;
+
+    let user = db::users::get_user_by_id(&db_pool, post.user_id)
+        .await
+        .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, "Could not load post author."))?;
+
+    let response = create_post_response(&post, &user, &db_pool)
+        .await
+        .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, "Could not load media."))?;
+
+    Ok(Json(response).into_response())
 }
