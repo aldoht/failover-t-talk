@@ -45,8 +45,8 @@ CREATE TABLE likes (
 );
 CREATE TABLE followers (
     follow_id       UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    followed_id     UUID NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
-    follows_id      UUID NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
-    CONSTRAINT followers_no_self_follow CHECK (followed_id <> follows_id),
-    CONSTRAINT followers_unique UNIQUE (followed_id, follows_id)
+    follower_id     UUID NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+    followee_id     UUID NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+    CONSTRAINT followers_no_self_follow CHECK (follower_id <> followee_id),
+    CONSTRAINT followers_unique UNIQUE (follower_id, followee_id)
 );
