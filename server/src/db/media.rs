@@ -1,5 +1,6 @@
 use serde::Serialize;
 use sqlx::PgPool;
+use uuid::Uuid;
 
 #[derive(Debug, Serialize)]
 pub struct MediaRecord {
@@ -11,9 +12,9 @@ pub struct MediaRecord {
 
 pub async fn create_media(
     db_pool: &PgPool,
-    url: String,
-    post_id: Option<uuid::Uuid>,
-    comment_id: Option<uuid::Uuid>,
+    url: &String,
+    post_id: &Option<uuid::Uuid>,
+    comment_id: &Option<uuid::Uuid>,
 ) -> anyhow::Result<MediaRecord> {
     let rec = match post_id {
         Some(id) => {
@@ -45,6 +46,24 @@ pub async fn create_media(
             .await?
         }
     };
+
+    Ok(rec)
+}
+
+pub async fn get_media_by_post_id(
+    db_pool: &PgPool,
+    post_id: &Uuid,
+) -> anyhow::Result<Vec<MediaRecord>> {
+    let rec = sqlx::query_as!(
+        MediaRecord,
+        r#"
+        SELECT media_id, url, post_id, comment_id FROM media AS m
+        WHERE post_id = $1;
+        "#,
+        post_id
+    )
+    .fetch_all(db_pool)
+    .await?;
 
     Ok(rec)
 }

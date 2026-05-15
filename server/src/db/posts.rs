@@ -1,6 +1,7 @@
 use chrono::{DateTime, Utc};
 use serde::Serialize;
 use sqlx::PgPool;
+use uuid::Uuid;
 
 #[derive(Debug, Serialize)]
 pub struct PostRecord {
@@ -48,4 +49,19 @@ pub async fn get_posts_by_tag(
     .await?;
 
     Ok(posts)
+}
+
+pub async fn get_post_like_count(
+    db_pool: &PgPool,
+    post_id: &Uuid,
+) -> anyhow::Result<i64> {
+    let count: i64 = sqlx::query_scalar!(
+        "SELECT COUNT(*) FROM likes WHERE post_id = $1",
+        post_id
+    )
+    .fetch_one(db_pool)
+    .await?
+    .unwrap_or(0);
+
+    Ok(count)
 }
