@@ -17,6 +17,7 @@ use crate::db;
 pub struct UserResponse {
     pub name: String,
     pub tag: String,
+    pub profile_picture_url: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -43,6 +44,7 @@ pub async fn user_by_tag(
     Json(UserResponse {
         name: user.name,
         tag: user.tag,
+        profile_picture_url: user.profile_picture_url,
     })
     .into_response()
 }
@@ -93,7 +95,37 @@ pub async fn user_follows(
     State(db_pool): State<PgPool>,
     Path(tag): Path<String>,
 ) -> impl IntoResponse + Debug {
-    let user_following = db::users::get_user_follows(&db_pool, &tag).await;
+    let user_follows = db::users::get_user_follows(&db_pool, &tag).await;
+
+    let users: Vec<UserResponse> = match user_follows {
+        Ok(users) => {
+            let mut response: Vec<UserResponse> = Vec::new();
+            for user in users.iter() {
+                response.push(UserResponse {
+                    name: user.name.clone(),
+                    tag: user.tag.clone(),
+                    profile_picture_url: user.profile_picture_url.clone(),
+                });
+            }
+            response
+        }
+        Err(_) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Error while getting user's follows.",
+            )
+                .into_response();
+        }
+    };
+
+    Json(users).into_response()
+}
+
+pub async fn user_followed_by(
+    State(db_pool): State<PgPool>,
+    Path(tag): Path<String>,
+) -> impl IntoResponse + Debug {
+    let user_following = db::users::get_user_followed_by(&db_pool, &tag).await;
 
     let users: Vec<UserResponse> = match user_following {
         Ok(users) => {
@@ -102,6 +134,7 @@ pub async fn user_follows(
                 response.push(UserResponse {
                     name: user.name.clone(),
                     tag: user.tag.clone(),
+                    profile_picture_url: user.profile_picture_url.clone(),
                 });
             }
             response
