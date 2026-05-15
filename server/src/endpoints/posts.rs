@@ -21,6 +21,7 @@ pub struct PostRequest {
 
 #[derive(Serialize)]
 pub struct PostResponse {
+    pub post_id: Uuid,
     pub user_name: String,
     pub user_tag: String,
     pub user_profile_pic_url: Option<String>,
@@ -114,6 +115,7 @@ pub async fn get_posts_by_tag(
                     Ok(media) => {
                         if media.is_empty() {
                             response.push(PostResponse {
+                                post_id: post.post_id,
                                 user_name: user.name.clone(),
                                 user_tag: user.tag.clone(),
                                 user_profile_pic_url: user.profile_picture_url.clone(),
@@ -128,6 +130,7 @@ pub async fn get_posts_by_tag(
                                 media_urls.push(m.url.clone());
                             }
                             response.push(PostResponse {
+                                post_id: post.post_id,
                                 user_name: user.name.clone(),
                                 user_tag: user.tag.clone(),
                                 user_profile_pic_url: user.profile_picture_url.clone(),
