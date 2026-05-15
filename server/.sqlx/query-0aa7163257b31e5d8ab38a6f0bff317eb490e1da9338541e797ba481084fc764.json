@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n        SELECT user_id, name, tag, email, password, is_admin FROM users AS u\n        WHERE u.tag = $1;\n        ",
+  "query": "\n        SELECT user_id, name, tag, email, password, is_admin, profile_picture_url, bio FROM users AS u\n        WHERE u.email = $1;\n        ",
   "describe": {
     "columns": [
       {
@@ -32,6 +32,16 @@
         "ordinal": 5,
         "name": "is_admin",
         "type_info": "Bool"
+      },
+      {
+        "ordinal": 6,
+        "name": "profile_picture_url",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 7,
+        "name": "bio",
+        "type_info": "Varchar"
       }
     ],
     "parameters": {
@@ -45,8 +55,10 @@
       false,
       false,
       false,
-      false
+      false,
+      true,
+      true
     ]
   },
-  "hash": "fcb405978066d5460413258bdae6fbeff84bb2e5dd75a1b4769df792fdc4fee0"
+  "hash": "0aa7163257b31e5d8ab38a6f0bff317eb490e1da9338541e797ba481084fc764"
 }

@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n        INSERT INTO followers (followed_id, follows_id)\n        VALUES ($1, $2)\n        RETURNING follow_id, followed_id, follows_id\n        ",
+  "query": "\n        INSERT INTO followers (follower_id, followee_id)\n        VALUES ($1, $2)\n        RETURNING follow_id, follower_id, followee_id\n        ",
   "describe": {
     "columns": [
       {
@@ -10,12 +10,12 @@
       },
       {
         "ordinal": 1,
-        "name": "followed_id",
+        "name": "follower_id",
         "type_info": "Uuid"
       },
       {
         "ordinal": 2,
-        "name": "follows_id",
+        "name": "followee_id",
         "type_info": "Uuid"
       }
     ],
@@ -31,5 +31,5 @@
       false
     ]
   },
-  "hash": "c18aa7fa128ede596986f25dc348886bbcff15009cc5f3f923a045d2d3a8e368"
+  "hash": "19751aff39110f32bb6fe38728770962515f958601dcf5277107c2ecf2a8cdf7"
 }
