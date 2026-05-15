@@ -18,6 +18,7 @@ pub struct UserResponse {
     pub name: String,
     pub tag: String,
     pub profile_picture_url: Option<String>,
+    pub bio: Option<String>
 }
 
 #[derive(Deserialize)]
@@ -45,6 +46,7 @@ pub async fn user_by_tag(
         name: user.name,
         tag: user.tag,
         profile_picture_url: user.profile_picture_url,
+        bio: user.bio,
     })
     .into_response()
 }
@@ -105,6 +107,7 @@ pub async fn user_follows(
                     name: user.name.clone(),
                     tag: user.tag.clone(),
                     profile_picture_url: user.profile_picture_url.clone(),
+                    bio: user.bio.clone(),
                 });
             }
             response
@@ -135,6 +138,7 @@ pub async fn user_followed_by(
                     name: user.name.clone(),
                     tag: user.tag.clone(),
                     profile_picture_url: user.profile_picture_url.clone(),
+                    bio: user.bio.clone(),
                 });
             }
             response

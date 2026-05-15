@@ -32,7 +32,12 @@ pub fn valid_name(name: &str) -> bool {
     !name.is_empty() && name.chars().count() <= 30 && RE_NAME.is_match(name)
 }
 
-// Max 500 chars
+// Max 500 chars; remove later since it was moved from VARCHAR to TEXT
 pub fn valid_url(url: &str) -> bool {
     !url.is_empty() && url.chars().count() <= 500
+}
+
+// Max 160 chars
+pub fn valid_bio(bio: &str) -> bool {
+    !bio.chars().count() > 160
 }

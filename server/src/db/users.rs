@@ -10,6 +10,7 @@ pub struct UserRecord {
     pub password: String,
     pub is_admin: bool,
     pub profile_picture_url: Option<String>,
+    pub bio: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -23,7 +24,7 @@ pub async fn get_users(db_pool: &PgPool) -> anyhow::Result<Vec<UserRecord>> {
     let rec: Vec<UserRecord> = sqlx::query_as!(
         UserRecord,
         r#"
-        SELECT user_id, name, tag, email, password, is_admin, profile_picture_url FROM users;
+        SELECT user_id, name, tag, email, password, is_admin, profile_picture_url, bio FROM users;
         "#
     )
     .fetch_all(db_pool)
@@ -36,7 +37,7 @@ pub async fn get_user_by_email(db_pool: &PgPool, email: &String) -> anyhow::Resu
     let rec: UserRecord = sqlx::query_as!(
         UserRecord,
         r#"
-        SELECT user_id, name, tag, email, password, is_admin, profile_picture_url FROM users AS u
+        SELECT user_id, name, tag, email, password, is_admin, profile_picture_url, bio FROM users AS u
         WHERE u.email = $1;
         "#,
         email
@@ -51,7 +52,7 @@ pub async fn get_user_by_tag(db_pool: &PgPool, tag: &String) -> anyhow::Result<U
     let rec: UserRecord = sqlx::query_as!(
         UserRecord,
         r#"
-        SELECT user_id, name, tag, email, password, is_admin, profile_picture_url FROM users AS u
+        SELECT user_id, name, tag, email, password, is_admin, profile_picture_url, bio FROM users AS u
         WHERE u.tag = $1;
         "#,
         tag
@@ -68,7 +69,7 @@ pub async fn get_user_follows(db_pool: &PgPool, tag: &String) -> anyhow::Result<
     let recs: Vec<UserRecord> = sqlx::query_as!(
         UserRecord,
         r#"
-        SELECT user_id, name, tag, email, password, is_admin, profile_picture_url
+        SELECT user_id, name, tag, email, password, is_admin, profile_picture_url, bio
         FROM users AS u
         INNER JOIN followers AS f ON f.followee_id = u.user_id
         WHERE f.follower_id = $1;
@@ -87,7 +88,7 @@ pub async fn get_user_followed_by(db_pool: &PgPool, tag: &String) -> anyhow::Res
     let recs: Vec<UserRecord> = sqlx::query_as!(
         UserRecord,
         r#"
-        SELECT user_id, name, tag, email, password, is_admin, profile_picture_url
+        SELECT user_id, name, tag, email, password, is_admin, profile_picture_url, bio
         FROM users AS u
         INNER JOIN followers AS f ON f.follower_id = u.user_id
         WHERE f.followee_id = $1;
@@ -106,18 +107,22 @@ pub async fn create_user(
     tag: &String,
     email: &String,
     password: &String,
+    profile_picture_url: Option<&str>,
+    bio: Option<&str>,
 ) -> anyhow::Result<UserRecord> {
     let rec: UserRecord = sqlx::query_as!(
         UserRecord,
         r#"
-        INSERT INTO users (name, tag, email, password)
-        VALUES ($1, $2, $3, $4)
-        RETURNING user_id, name, tag, email, password, is_admin, profile_picture_url
+        INSERT INTO users (name, tag, email, password, profile_picture_url, bio)
+        VALUES ($1, $2, $3, $4, $5, $6)
+        RETURNING user_id, name, tag, email, password, is_admin, profile_picture_url, bio
         "#,
         name,
         tag,
         email,
-        password
+        password,
+        profile_picture_url,
+        bio,
     )
     .fetch_one(db_pool)
     .await?;

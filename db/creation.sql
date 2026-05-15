@@ -6,6 +6,7 @@ CREATE TABLE users (
     password            VARCHAR(255) NOT NULL,
     is_admin            BOOLEAN NOT NULL DEFAULT false,
     profile_picture_url TEXT
+    bio                 VARCHAR(160)
 );
 CREATE TABLE posts (
     post_id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),

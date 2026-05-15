@@ -15,7 +15,7 @@ use sqlx::PgPool;
 
 use crate::{
     db,
-    utils::{valid_email, valid_password, valid_tag},
+    utils::{valid_bio, valid_email, valid_password, valid_tag},
 };
 
 #[derive(Serialize, Deserialize)]
@@ -37,6 +37,8 @@ pub struct SignupRequest {
     pub tag: String,
     pub email: String,
     pub password: String,
+    pub profile_picture_url: Option<String>,
+    pub bio: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -131,6 +133,14 @@ pub async fn signup(
     {
         return (StatusCode::BAD_REQUEST, "Invalid values.").into_response();
     }
+    match &body.bio {
+        Some(b) => {
+            if !valid_bio(&b[..]) {
+                return (StatusCode::BAD_REQUEST, "Invalid bio.").into_response()
+            }
+        },
+        None => {}
+    }
 
     match db::utils::check_exists_email(&db_pool, &body.email).await {
         Ok(true) => {
@@ -160,6 +170,8 @@ pub async fn signup(
         &body.tag,
         &body.email,
         &hashed_password,
+        body.profile_picture_url.as_deref(),
+        body.bio.as_deref(),
     )
     .await
     {

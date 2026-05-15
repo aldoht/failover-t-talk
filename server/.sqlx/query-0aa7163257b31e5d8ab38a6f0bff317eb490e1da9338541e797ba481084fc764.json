@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n        SELECT user_id, name, tag, email, password, is_admin, profile_picture_url\n        FROM users AS u\n        INNER JOIN followers AS f ON f.followee_id = u.user_id\n        WHERE f.follower_id = $1;\n        ",
+  "query": "\n        SELECT user_id, name, tag, email, password, is_admin, profile_picture_url, bio FROM users AS u\n        WHERE u.email = $1;\n        ",
   "describe": {
     "columns": [
       {
@@ -37,11 +37,16 @@
         "ordinal": 6,
         "name": "profile_picture_url",
         "type_info": "Text"
+      },
+      {
+        "ordinal": 7,
+        "name": "bio",
+        "type_info": "Varchar"
       }
     ],
     "parameters": {
       "Left": [
-        "Uuid"
+        "Text"
       ]
     },
     "nullable": [
@@ -51,8 +56,9 @@
       false,
       false,
       false,
+      true,
       true
     ]
   },
-  "hash": "8f3e07151019343b194713046816ed352413042811f2fdbd57cd6f93bd574fb4"
+  "hash": "0aa7163257b31e5d8ab38a6f0bff317eb490e1da9338541e797ba481084fc764"
 }
