@@ -19,12 +19,6 @@ pub struct UserRequest {
 }
 
 #[derive(Deserialize)]
-pub struct PostRequest {
-    pub text: String,
-    pub url: Option<String>,
-}
-
-#[derive(Deserialize)]
 pub struct FollowRequest {
     pub follows_tag: String,
 }
@@ -41,36 +35,6 @@ pub async fn user_by_tag(State(db_pool): State<PgPool>, Path(tag): Path<String>)
         name: user.name,
         tag: user.tag,
     }).into_response()
-}
-
-pub async fn create_post(State(db_pool): State<PgPool>, headers: HeaderMap, Json(body): Json<PostRequest>) -> impl IntoResponse + Debug {
-    let claims: Claims = match extract_token(&headers) {
-        Ok(c) => c,
-        Err(e) => return e.into_response(),
-    };
-    let user_id: uuid::Uuid = match uuid::Uuid::parse_str(&claims.sub[..]) {
-        Ok(id) => id,
-        Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR, "Could not retrieve user's ID.").into_response(),
-    };
-    
-    let post: db::PostRecord = match db::create_post(&db_pool, &user_id, &body.text).await {
-        Ok(p) => p,
-        Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR, "There was an error while writing to the database.").into_response()
-    };
-    
-    match body.url {
-        Some(u) => {
-            if utils::valid_url(&u) {
-                match db::create_media(&db_pool, u, Some(post.post_id), None).await {
-                    Ok(_) => return (StatusCode::OK, "Created post with media successfully.").into_response(),
-                    Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR, "There was an error when attaching media.").into_response(),
-                };
-            }
-        },
-        None => {},
-    };
-    
-    (StatusCode::OK, "Created post successfully.").into_response()   
 }
 
 // Check if user already follows target

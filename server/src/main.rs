@@ -1,11 +1,10 @@
-use axum::{Json, Router, extract::State, routing::{get, post}};
+use axum::{Json, Router, routing::{get, post}};
 use tower::ServiceBuilder;
 use tower_http::{cors::{CorsLayer, Any}};
 use prometheus::{Counter, Encoder, TextEncoder, register_counter};
 use serde::Serialize;
 use tokio::net::TcpListener;
 
-use crate::auth::{LoginRequest, login};
 mod db;
 mod auth;
 mod utils;
@@ -49,10 +48,10 @@ async fn main() {
         .route("/api/status", get(api_status))
         .route("/signup", post(auth::signup))
         .route("/login", post(auth::login))
-        .route("/users/{tag}", get(endpoints::user_by_tag))
-        .route("/users/{tag}/following", get(endpoints::user_follows))
-        .route("/posts", post(endpoints::create_post))
-        .route("/follow", post(endpoints::follow_user))
+        .route("/users/{tag}", get(endpoints::users::user_by_tag))
+        .route("/users/{tag}/following", get(endpoints::users::user_follows))
+        .route("/follow", post(endpoints::users::follow_user))
+        .route("/posts", post(endpoints::posts::create_post))
         .layer(middleware)
         .with_state(db_pool);
     let listener: TcpListener = TcpListener::bind(format!("{host}:{port}")).await.unwrap();
