@@ -9,7 +9,7 @@ use uuid::Uuid;
 
 use crate::{
     auth::{Claims, extract_token},
-    db::{self},
+    db::{self, media::MediaRecord, posts::PostRecord, users::UserRecord},
     utils,
 };
 
@@ -87,18 +87,44 @@ pub async fn create_post(
     (StatusCode::OK, "Created post successfully.").into_response()
 }
 
+fn handle_post_media(media: Vec<MediaRecord>, response: &mut Vec<PostResponse>, post: &PostRecord, user: &UserRecord, likes: i64) -> () {
+    if media.is_empty() {
+        response.push(PostResponse {
+            post_id: post.post_id,
+            user_name: user.name.clone(),
+            user_tag: user.tag.clone(),
+            user_profile_pic_url: user.profile_picture_url.clone(),
+            text: post.text.clone(),
+            created_at: post.created_at,
+            media_urls: None,
+            like_count: likes,
+        });
+    } else {
+        let mut media_urls: Vec<String> = Vec::new();
+        for m in media.iter() {
+            media_urls.push(m.url.clone());
+        }
+        response.push(PostResponse {
+            post_id: post.post_id,
+            user_name: user.name.clone(),
+            user_tag: user.tag.clone(),
+            user_profile_pic_url: user.profile_picture_url.clone(),
+            text: post.text.clone(),
+            created_at: post.created_at,
+            media_urls: Some(media_urls),
+            like_count: likes,
+        });
+    };
+}
+
 pub async fn get_posts_by_tag(
     State(db_pool): State<PgPool>,
     Path(tag): Path<String>,
 ) -> impl IntoResponse + Debug {
     let user = db::users::get_user_by_tag(&db_pool, &tag).await;
     let user: db::users::UserRecord = match user {
-        Ok(u) => {
-            u
-        },
-        Err(_) => {
-            return (StatusCode::NOT_FOUND, "User with tag not found.").into_response();
-        }
+        Ok(u) => u,
+        Err(_) => { return (StatusCode::NOT_FOUND, "User with tag not found.").into_response(); }
     };
     
     let posts = db::posts::get_posts_by_tag(&db_pool, &tag).await;
@@ -113,44 +139,14 @@ pub async fn get_posts_by_tag(
                 
                 match db::media::get_media_by_post_id(&db_pool, &post.post_id).await {
                     Ok(media) => {
-                        if media.is_empty() {
-                            response.push(PostResponse {
-                                post_id: post.post_id,
-                                user_name: user.name.clone(),
-                                user_tag: user.tag.clone(),
-                                user_profile_pic_url: user.profile_picture_url.clone(),
-                                text: post.text.clone(),
-                                created_at: post.created_at,
-                                media_urls: None,
-                                like_count: likes,
-                            });
-                        } else {
-                            let mut media_urls: Vec<String> = Vec::new();
-                            for m in media.iter() {
-                                media_urls.push(m.url.clone());
-                            }
-                            response.push(PostResponse {
-                                post_id: post.post_id,
-                                user_name: user.name.clone(),
-                                user_tag: user.tag.clone(),
-                                user_profile_pic_url: user.profile_picture_url.clone(),
-                                text: post.text.clone(),
-                                created_at: post.created_at,
-                                media_urls: Some(media_urls),
-                                like_count: likes,
-                            });
-                        };
+                        handle_post_media(media, &mut response, post, &user, likes);
                     },
-                    Err(_) => {
-                        return (StatusCode::INTERNAL_SERVER_ERROR, "Could not load media.").into_response();
-                    }
+                    Err(_) => { return (StatusCode::INTERNAL_SERVER_ERROR, "Could not load media.").into_response(); }
                 };
             };
             response
         },
-        Err(_) => {
-            return (StatusCode::INTERNAL_SERVER_ERROR, "Could not load posts.").into_response();
-        }
+        Err(_) => { return (StatusCode::INTERNAL_SERVER_ERROR, "Could not load posts.").into_response(); }
     };
 
     Json(posts).into_response()
