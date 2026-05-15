@@ -1,4 +1,4 @@
-use chrono::NaiveDate;
+use chrono::{DateTime, Utc};
 use serde::Serialize;
 use sqlx::PgPool;
 
@@ -7,7 +7,7 @@ pub struct PostRecord {
     pub post_id: uuid::Uuid,
     pub user_id: uuid::Uuid,
     pub text: String,
-    pub creation_date: NaiveDate,
+    pub created_at: DateTime<Utc>,
 }
 
 pub async fn create_post(
@@ -20,7 +20,7 @@ pub async fn create_post(
         r#"
         INSERT INTO posts (user_id, text)
         VALUES ($1, $2)
-        RETURNING post_id, user_id, text, creation_date
+        RETURNING post_id, user_id, text, created_at;
         "#,
         user_id,
         text,
@@ -29,4 +29,23 @@ pub async fn create_post(
     .await?;
 
     Ok(rec)
+}
+
+pub async fn get_posts_by_tag(
+    db_pool: &PgPool,
+    tag: &String,
+) -> anyhow::Result<Vec<PostRecord>> {
+    let posts: Vec<PostRecord> = sqlx::query_as!(
+        PostRecord,
+        r#"
+        SELECT post_id, p.user_id, text, created_at FROM posts AS p
+        INNER JOIN users AS u ON p.user_id = u.user_id
+        WHERE u.tag = $1;
+        "#,
+        tag,
+    )
+    .fetch_all(db_pool)
+    .await?;
+
+    Ok(posts)
 }

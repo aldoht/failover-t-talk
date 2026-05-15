@@ -11,14 +11,14 @@ CREATE TABLE posts (
     post_id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id         UUID NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
     text            VARCHAR(280) NOT NULL,
-    creation_date   DATE NOT NULL DEFAULT CURRENT_DATE
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 CREATE TABLE comments (
     comment_id      UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     post_id         UUID NOT NULL REFERENCES posts(post_id) ON DELETE CASCADE,
     user_id         UUID NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
     text            VARCHAR(280) NOT NULL,
-    creation_date   DATE NOT NULL DEFAULT CURRENT_DATE
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 CREATE TABLE media (
     media_id        UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -35,7 +35,7 @@ CREATE TABLE likes (
     user_id         UUID NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
     post_id         UUID REFERENCES posts(post_id) ON DELETE CASCADE,
     comment_id      UUID REFERENCES comments(comment_id) ON DELETE CASCADE,
-    creation_date   DATE NOT NULL DEFAULT CURRENT_DATE,
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     CONSTRAINT likes_one_target CHECK (
         (post_id IS NOT NULL AND comment_id IS NULL) OR
         (post_id IS NULL AND comment_id IS NOT NULL)
