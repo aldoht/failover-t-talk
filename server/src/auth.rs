@@ -2,9 +2,8 @@ use std::fmt::Debug;
 
 use axum::{
     Json,
-    body::Body,
     extract::State,
-    http::{HeaderMap, Response, StatusCode},
+    http::{HeaderMap, StatusCode},
     response::IntoResponse,
 };
 use chrono;
@@ -15,7 +14,7 @@ use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
 
 use crate::{
-    db::{check_exists_email, check_exists_tag, create_user, get_user_by_email},
+    db,
     utils::{valid_email, valid_password, valid_tag},
 };
 
@@ -80,11 +79,11 @@ pub fn extract_token(headers: &HeaderMap) -> Result<Claims, (StatusCode, &'stati
         .get("Authorization")
         .and_then(|v| v.to_str().ok())
         .ok_or((StatusCode::UNAUTHORIZED, "Missing Authorization header."))?;
-    
+
     let token = auth_header
         .strip_prefix("Bearer ")
         .ok_or((StatusCode::UNAUTHORIZED, "Invalid Authorization format."))?;
-    
+
     validate_token(token.into())
         .map_err(|_| (StatusCode::UNAUTHORIZED, "Invalid or expired token."))
 }
@@ -106,7 +105,7 @@ pub async fn login(
     State(db_pool): State<PgPool>,
     Json(body): Json<LoginRequest>,
 ) -> impl IntoResponse + Debug {
-    let user = get_user_by_email(&db_pool, &body.email).await;
+    let user = db::users::get_user_by_email(&db_pool, &body.email).await;
 
     let user = match user {
         Ok(u) => u,
@@ -133,7 +132,7 @@ pub async fn signup(
         return (StatusCode::BAD_REQUEST, "Invalid values.").into_response();
     }
 
-    match check_exists_email(&db_pool, &body.email).await {
+    match db::utils::check_exists_email(&db_pool, &body.email).await {
         Ok(true) => {
             return (StatusCode::BAD_REQUEST, "Email already registered.").into_response();
         }
@@ -143,7 +142,7 @@ pub async fn signup(
         Ok(false) => {}
     }
 
-    match check_exists_tag(&db_pool, &body.tag).await {
+    match db::utils::check_exists_tag(&db_pool, &body.tag).await {
         Ok(true) => {
             return (StatusCode::BAD_REQUEST, "Tag already exists.").into_response();
         }
@@ -155,7 +154,7 @@ pub async fn signup(
 
     let hashed_password: String = bcrypt::hash(&body.password, bcrypt::DEFAULT_COST).unwrap();
 
-    match create_user(
+    match db::users::create_user(
         &db_pool,
         &body.name,
         &body.tag,

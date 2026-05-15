@@ -25,7 +25,7 @@ struct StatusResponse {
 #[tokio::main]
 async fn main() {
     dotenvy::dotenv().ok();
-    let db_pool = db::create_db_pool().await;
+    let db_pool = db::utils::create_db_pool().await;
 
     let port: u16 = std::env::var("PORT")
         .unwrap_or("8080".into())

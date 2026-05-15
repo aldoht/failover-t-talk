@@ -1,4 +1,3 @@
-use chrono::NaiveDate;
 use serde::Serialize;
 use sqlx::PgPool;
 
@@ -13,33 +12,10 @@ pub struct UserRecord {
 }
 
 #[derive(Debug, Serialize)]
-pub struct PostRecord {
-    pub post_id: uuid::Uuid,
-    pub user_id: uuid::Uuid,
-    pub text: String,
-    pub creation_date: NaiveDate,
-}
-
-#[derive(Debug, Serialize)]
-pub struct MediaRecord {
-    pub media_id: uuid::Uuid,
-    pub url: String,
-    pub post_id: Option<uuid::Uuid>,
-    pub comment_id: Option<uuid::Uuid>,
-}
-
-#[derive(Debug, Serialize)]
 pub struct FollowersRecord {
     pub follow_id: uuid::Uuid,
     pub followed_id: uuid::Uuid,
     pub follows_id: uuid::Uuid,
-}
-
-pub async fn create_db_pool() -> PgPool {
-    let url = std::env::var("AWS_PSQL_URL").expect("Database URL not set.");
-    PgPool::connect(&url)
-        .await
-        .expect("Failed to connect to database.")
 }
 
 pub async fn get_users(db_pool: &PgPool) -> anyhow::Result<Vec<UserRecord>> {
@@ -87,7 +63,7 @@ pub async fn get_user_by_tag(db_pool: &PgPool, tag: &String) -> anyhow::Result<U
 
 pub async fn get_user_follows(db_pool: &PgPool, tag: &String) -> anyhow::Result<Vec<UserRecord>> {
     let user: UserRecord = get_user_by_tag(db_pool, tag).await?;
-    
+
     let recs: Vec<UserRecord> = sqlx::query_as!(
         UserRecord,
         r#"
@@ -129,64 +105,11 @@ pub async fn create_user(
     Ok(rec)
 }
 
-pub async fn create_media(
+pub async fn create_follow(
     db_pool: &PgPool,
-    url: String,
-    post_id: Option<uuid::Uuid>,
-    comment_id: Option<uuid::Uuid>,
-) -> anyhow::Result<MediaRecord> {
-    let rec = match post_id {
-        Some(id) => sqlx::query_as!(
-            MediaRecord,
-            r#"
-            INSERT INTO media (url, post_id)
-            VALUES ($1, $2)
-            RETURNING media_id, url, post_id, comment_id
-            "#,
-            url,
-            id,
-        )
-        .fetch_one(db_pool)
-        .await?,
-        None => sqlx::query_as!(
-            MediaRecord,
-            r#"
-            INSERT INTO media (url, post_id)
-            VALUES ($1, $2)
-            RETURNING media_id, url, post_id, comment_id
-            "#,
-            url,
-            comment_id.expect("Err"),
-        )
-        .fetch_one(db_pool)
-        .await?,
-    };
-
-    Ok(rec)
-}
-
-pub async fn create_post(
-    db_pool: &PgPool,
-    user_id: &uuid::Uuid,
-    text: &String,
-) -> anyhow::Result<PostRecord> {
-    let rec: PostRecord = sqlx::query_as!(
-        PostRecord,
-        r#"
-        INSERT INTO posts (user_id, text)
-        VALUES ($1, $2)
-        RETURNING post_id, user_id, text, creation_date
-        "#,
-        user_id,
-        text,
-    )
-    .fetch_one(db_pool)
-    .await?;
-
-    Ok(rec)
-}
-
-pub async fn create_follow(db_pool: &PgPool, followed_id: &uuid::Uuid, follows_id: &uuid::Uuid) -> anyhow::Result<FollowersRecord> {
+    followed_id: &uuid::Uuid,
+    follows_id: &uuid::Uuid,
+) -> anyhow::Result<FollowersRecord> {
     let rec: FollowersRecord = sqlx::query_as!(
         FollowersRecord,
         r#"
@@ -199,26 +122,6 @@ pub async fn create_follow(db_pool: &PgPool, followed_id: &uuid::Uuid, follows_i
     )
     .fetch_one(db_pool)
     .await?;
-    
+
     Ok(rec)
-}
-
-pub async fn check_exists_email(db_pool: &PgPool, email: &String) -> anyhow::Result<bool> {
-    let exists: bool =
-        sqlx::query_scalar!("SELECT EXISTS(SELECT 1 FROM users WHERE email = $1)", email)
-            .fetch_one(db_pool)
-            .await?
-            .unwrap_or(false);
-
-    Ok(exists)
-}
-
-pub async fn check_exists_tag(db_pool: &PgPool, tag: &String) -> anyhow::Result<bool> {
-    let exists: bool =
-        sqlx::query_scalar!("SELECT EXISTS(SELECT 1 FROM users WHERE tag = $1)", tag)
-            .fetch_one(db_pool)
-            .await?
-            .unwrap_or(false);
-
-    Ok(exists)
 }

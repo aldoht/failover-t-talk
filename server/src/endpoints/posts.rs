@@ -1,11 +1,15 @@
 use std::fmt::Debug;
 
-use axum::{Json, extract::{Path, State}, http::HeaderMap, response::IntoResponse};
+use axum::{Json, extract::State, http::HeaderMap, response::IntoResponse};
 use reqwest::StatusCode;
-use serde::{Deserialize, Serialize};
-use sqlx::{PgPool};
+use serde::Deserialize;
+use sqlx::PgPool;
 
-use crate::{auth::{Claims, extract_token}, db::{self}, utils};
+use crate::{
+    auth::{Claims, extract_token},
+    db::{self},
+    utils,
+};
 
 #[derive(Deserialize)]
 pub struct PostRequest {
@@ -13,32 +17,58 @@ pub struct PostRequest {
     pub url: Option<String>,
 }
 
-pub async fn create_post(State(db_pool): State<PgPool>, headers: HeaderMap, Json(body): Json<PostRequest>) -> impl IntoResponse + Debug {
+pub async fn create_post(
+    State(db_pool): State<PgPool>,
+    headers: HeaderMap,
+    Json(body): Json<PostRequest>,
+) -> impl IntoResponse + Debug {
     let claims: Claims = match extract_token(&headers) {
         Ok(c) => c,
         Err(e) => return e.into_response(),
     };
     let user_id: uuid::Uuid = match uuid::Uuid::parse_str(&claims.sub[..]) {
         Ok(id) => id,
-        Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR, "Could not retrieve user's ID.").into_response(),
+        Err(_) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Could not retrieve user's ID.",
+            )
+                .into_response();
+        }
     };
-    
-    let post: db::PostRecord = match db::create_post(&db_pool, &user_id, &body.text).await {
-        Ok(p) => p,
-        Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR, "There was an error while writing to the database.").into_response()
-    };
-    
+
+    let post: db::posts::PostRecord =
+        match db::posts::create_post(&db_pool, &user_id, &body.text).await {
+            Ok(p) => p,
+            Err(_) => {
+                return (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "There was an error while writing to the database.",
+                )
+                    .into_response();
+            }
+        };
+
     match body.url {
         Some(u) => {
             if utils::valid_url(&u) {
-                match db::create_media(&db_pool, u, Some(post.post_id), None).await {
-                    Ok(_) => return (StatusCode::OK, "Created post with media successfully.").into_response(),
-                    Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR, "There was an error when attaching media.").into_response(),
+                match db::media::create_media(&db_pool, u, Some(post.post_id), None).await {
+                    Ok(_) => {
+                        return (StatusCode::OK, "Created post with media successfully.")
+                            .into_response();
+                    }
+                    Err(_) => {
+                        return (
+                            StatusCode::INTERNAL_SERVER_ERROR,
+                            "There was an error when attaching media.",
+                        )
+                            .into_response();
+                    }
                 };
             }
-        },
-        None => {},
+        }
+        None => {}
     };
-    
-    (StatusCode::OK, "Created post successfully.").into_response()   
+
+    (StatusCode::OK, "Created post successfully.").into_response()
 }
