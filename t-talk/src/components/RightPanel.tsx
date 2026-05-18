@@ -24,11 +24,11 @@ type Props = {
 
 export default function RightPanel({ onSearchTrend, onFollowSuggestion, followedUserIds = [] }: Props) {
   const trends: TrendItem[] = [
-    { hashtag: "#Mundial", postsCount: "12.4K posts" },
+    { hashtag: "Canción", postsCount: "12.4K posts" },
     { hashtag: "#Monterrey", postsCount: "8.1K posts" },
-    { hashtag: "#Clima", postsCount: "21K posts" },
-    { hashtag: "#Marvel", postsCount: "3.2K posts" },
-    { hashtag: "#TTalk", postsCount: "6.7K posts" },
+    { hashtag: "Clima", postsCount: "21K posts" },
+    { hashtag: "Supermercado", postsCount: "3.2K posts" },
+    { hashtag: "Humor", postsCount: "6.7K posts" },
   ];
 
   // Mocks para usuarios sugeridos
