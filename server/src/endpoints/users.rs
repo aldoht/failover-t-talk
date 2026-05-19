@@ -2,14 +2,14 @@ use std::fmt::Debug;
 
 use axum::{
     Json,
-    extract::{Path, State},
+    extract::{Path, State, Query},
     http::HeaderMap,
 };
 use reqwest::StatusCode;
 use serde::{Deserialize, Serialize};
 use sqlx::{PgPool};
 
-use crate::{auth::authenticate, errors::AppError};
+use crate::{auth::{Claims, authenticate}, errors::AppError};
 use crate::db;
 
 #[derive(Debug, Serialize)]
@@ -41,6 +41,11 @@ pub struct FollowRequest {
     pub follows_tag: String,
 }
 
+#[derive(Deserialize)]
+pub struct UnfollowParams {
+    pub tag: String,
+}
+
 pub async fn user_by_tag(
     State(db_pool): State<PgPool>,
     Path(tag): Path<String>,
@@ -69,6 +74,17 @@ pub async fn follow_user(
         })?;
 
     Ok((StatusCode::CREATED, "Created follow successfully."))
+}
+
+pub async fn unfollow_user(
+    State(db_pool): State<PgPool>,
+    claims: Claims,
+    Query(params): Query<UnfollowParams>,
+) -> Result<StatusCode, AppError> {
+    let followed_user = db::users::get_user_by_tag(&db_pool, &params.tag).await?;
+    db::users::delete_follow(&db_pool, &claims.sub, &followed_user.user_id).await?;
+
+    Ok(StatusCode::NO_CONTENT)
 }
 
 pub async fn user_follows(

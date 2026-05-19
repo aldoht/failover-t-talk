@@ -1,6 +1,6 @@
 use std::sync::LazyLock;
 
-use axum::{Json, Router, routing::{get, post}};
+use axum::{Json, Router, routing::{delete, get, post}};
 use tower::ServiceBuilder;
 use tower_http::{cors::{CorsLayer, Any}};
 use prometheus::{Counter, Encoder, TextEncoder, register_counter};
@@ -56,6 +56,7 @@ async fn main() {
         .route("/users/{tag}/following", get(endpoints::users::user_follows))
         .route("/users/{tag}/followers", get(endpoints::users::user_followed_by))
         .route("/follow", post(endpoints::users::follow_user))
+        .route("/unfollow", delete(endpoints::users::unfollow_user))
         .route("/posts", post(endpoints::posts::create_post))
         .route("/posts/{tag}", get(endpoints::posts::get_posts_by_tag))
         .route("/post/{id}", get(endpoints::posts::get_post_by_id))

@@ -155,3 +155,19 @@ pub async fn create_follow(
 
     Ok(rec)
 }
+
+pub async fn delete_follow(
+    db_pool: &PgPool,
+    follower_id: &Uuid,
+    followee_id: &Uuid,
+) -> Result<(), sqlx::Error> {
+    sqlx::query!(
+        "DELETE FROM followers AS f WHERE f.follower_id = $1 AND f.followee_id = $2;",
+        follower_id,
+        followee_id
+    )
+    .execute(db_pool)
+    .await?;
+
+    Ok(())
+}

@@ -1,7 +1,7 @@
 use axum::{
     Json,
-    extract::State,
-    http::{HeaderMap},
+    extract::{FromRequestParts, State},
+    http::HeaderMap,
 };
 use chrono;
 use jsonwebtoken::{
@@ -23,6 +23,21 @@ pub struct Claims {
     pub sub: Uuid,
     pub is_admin: bool,
     pub exp: usize,
+}
+
+impl<S> FromRequestParts<S> for Claims
+where
+    S: Send + Sync,
+{
+    type Rejection = AppError;
+
+    async fn from_request_parts(
+        parts: &mut axum::http::request::Parts,
+        _state: &S,
+    ) -> Result<Self, Self::Rejection>
+    {
+        authenticate(&parts.headers)
+    }
 }
 
 #[derive(Deserialize)]
