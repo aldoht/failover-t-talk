@@ -2,7 +2,6 @@ use axum::{
     Json,
     extract::{Path, State},
     http::{HeaderMap, StatusCode},
-    response::{IntoResponse, Response},
 };
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -105,24 +104,4 @@ pub async fn get_post_by_id(
     let response = create_post_response(&post, &user, &db_pool).await?;
 
     Ok(Json(response))
-}
-
-pub async fn like_post(
-    State(db_pool): State<PgPool>,
-    claims: Claims,
-    Path(id): Path<Uuid>,
-) -> Result<(StatusCode, &'static str), AppError> {
-    let _post = db::posts::get_post_by_id(&db_pool, id).await?;
-    db::likes::create_like(&db_pool, MediaTarget::Post(id), &claims.sub).await?;
-    Ok((StatusCode::CREATED, "Created like successfully."))
-}
-
-pub async fn remove_like_from_post(
-    State(db_pool): State<PgPool>,
-    claims: Claims,
-    Path(id): Path<Uuid>,
-) -> Result<StatusCode, AppError> {
-    let _post = db::posts::get_post_by_id(&db_pool, id).await?;
-    db::likes::delete_like(&db_pool, MediaTarget::Post(id), &claims.sub).await?;
-    Ok(StatusCode::NO_CONTENT)
 }

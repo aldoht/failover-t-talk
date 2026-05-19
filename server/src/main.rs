@@ -6,6 +6,7 @@ use tower_http::{cors::{CorsLayer, Any}};
 use prometheus::{Counter, Encoder, TextEncoder, register_counter};
 use serde::Serialize;
 use tokio::net::TcpListener;
+use tracing_subscriber::{EnvFilter, fmt};
 
 use crate::auth::init_jwt_secret;
 
@@ -27,6 +28,10 @@ struct StatusResponse {
 
 #[tokio::main]
 async fn main() {
+    fmt()
+    .with_env_filter(EnvFilter::try_from_default_env()
+        .unwrap_or_else(|_| EnvFilter::new("info")))
+    .init();
     dotenvy::dotenv().ok();
     let db_pool = db::utils::create_db_pool().await;
     init_jwt_secret();
@@ -60,8 +65,13 @@ async fn main() {
         .route("/posts", post(endpoints::posts::create_post))
         .route("/posts/{tag}", get(endpoints::posts::get_posts_by_tag))
         .route("/post/{id}", get(endpoints::posts::get_post_by_id))
-        .route("/post/{id}/like", post(endpoints::posts::like_post))
-        .route("/post/{id}/unlike", delete(endpoints::posts::remove_like_from_post))
+        .route("/post/{id}/like", post(endpoints::likes::like_post))
+        .route("/post/{id}/unlike", delete(endpoints::likes::remove_like_from_post))
+        .route("/comment/{id}", get(endpoints::comments::get_comment))
+        .route("/comment/reply/{id}", post(endpoints::comments::reply_to_comment))
+        .route("/comment/post/{id}", post(endpoints::comments::comment_on_post))
+        .route("/comment/{id}/like", post(endpoints::likes::like_comment))
+        .route("/comment/{id}/unlike", delete(endpoints::likes::remove_like_from_comment))
         .layer(middleware)
         .with_state(db_pool);
     let listener: TcpListener = TcpListener::bind(format!("{host}:{port}")).await.unwrap();
