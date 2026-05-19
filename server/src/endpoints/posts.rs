@@ -10,7 +10,7 @@ use sqlx::PgPool;
 use uuid::Uuid;
 
 use crate::{
-    auth::authenticate,
+    auth::{Claims, authenticate},
     db::{self, media::MediaTarget, posts::PostRecord, users::UserRecord},
     errors::AppError,
     utils,
@@ -99,10 +99,20 @@ pub async fn get_posts_by_tag(
 pub async fn get_post_by_id(
     State(db_pool): State<PgPool>,
     Path(id): Path<Uuid>,
-) -> Result<Response, AppError> {
+) -> Result<Json<PostResponse>, AppError> {
     let post = db::posts::get_post_by_id(&db_pool, id).await?;
     let user = db::users::get_user_by_id(&db_pool, post.user_id).await?;
     let response = create_post_response(&post, &user, &db_pool).await?;
 
-    Ok(Json(response).into_response())
+    Ok(Json(response))
+}
+
+pub async fn like_post(
+    State(db_pool): State<PgPool>,
+    claims: Claims,
+    Path(id): Path<Uuid>,
+) -> Result<(StatusCode, &'static str), AppError> {
+    let _post = db::posts::get_post_by_id(&db_pool, id).await?;
+    db::likes::create_like(&db_pool, MediaTarget::Post(id), &claims.sub).await?;
+    Ok((StatusCode::CREATED, "Created like successfully."))
 }

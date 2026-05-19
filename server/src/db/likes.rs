@@ -1,0 +1,42 @@
+use chrono::{DateTime, Utc};
+use sqlx::PgPool;
+use uuid::Uuid;
+
+use crate::{db::media::MediaTarget, errors::AppError};
+
+pub struct LikeRecord {
+    pub like_id: Uuid,
+    pub user_id: Uuid,
+    pub post_id: Option<Uuid>,
+    pub comment_id: Option<Uuid>,
+    pub created_at: DateTime<Utc>,
+}
+
+pub async fn create_like(
+    db_pool: &PgPool,
+    target: MediaTarget,
+    user_id: &Uuid,
+) -> Result<(), AppError> {
+    match target {
+        MediaTarget::Post(post_id) => {
+            sqlx::query!(
+                "INSERT INTO likes (user_id, post_id) VALUES ($1, $2)",
+                user_id,
+                post_id,
+            )
+            .execute(db_pool)
+            .await?
+        },
+        MediaTarget::Comment(comment_id) => {
+            sqlx::query!(
+                "INSERT INTO likes (user_id, comment_id) VALUES ($1, $2)",
+                user_id,
+                comment_id,
+            )
+            .execute(db_pool)
+            .await?
+        }
+    };
+
+    Ok(())
+}
