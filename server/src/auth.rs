@@ -1,26 +1,26 @@
-use std::fmt::Debug;
-
 use axum::{
     Json,
     extract::State,
-    http::{HeaderMap, StatusCode},
-    response::IntoResponse,
+    http::{HeaderMap},
 };
 use chrono;
 use jsonwebtoken::{
-    self, DecodingKey, EncodingKey, Header, Validation, decode, encode, errors::Error,
+    self, DecodingKey, EncodingKey, Header, Validation, decode, encode,
 };
 use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
+use uuid::Uuid;
+use std::sync::OnceLock;
 
 use crate::{
-    db,
-    utils::{valid_bio, valid_email, valid_password, valid_tag},
+    db, errors::AppError, utils::{valid_bio, valid_email, valid_name, valid_password, valid_user_tag}
 };
+
+static JWT_SECRET: OnceLock<String> = OnceLock::new();
 
 #[derive(Serialize, Deserialize)]
 pub struct Claims {
-    pub sub: String,
+    pub sub: Uuid,
     pub is_admin: bool,
     pub exp: usize,
 }
@@ -46,125 +46,91 @@ pub struct LoginResponse {
     pub token: String,
 }
 
-fn generate_token(user_uuid: &String, is_admin: &bool) -> String {
-    let exp: usize = chrono::Utc::now()
-        .checked_add_days(chrono::Days::new(1))
-        .unwrap()
-        .timestamp() as usize;
+pub fn init_jwt_secret() {
+    let secret = std::env::var("JWT_SECRET").expect("JWT_SECRET must be set");
+    JWT_SECRET.set(secret).expect("JWT_SECRET already initialized");
+}
 
+fn jwt_secret() -> &'static str {
+    JWT_SECRET.get().expect("JWT_SECRET not initialized")
+}
+
+fn generate_token(user_uuid: Uuid, is_admin: bool) -> Result<String, AppError> {
+    let exp = (chrono::Utc::now() + chrono::Duration::days(1)).timestamp() as usize;
     let claims = Claims {
-        sub: user_uuid.clone(),
-        is_admin: is_admin.clone(),
+        sub: user_uuid,
+        is_admin,
         exp,
     };
-
     encode(
         &Header::new(jsonwebtoken::Algorithm::HS256),
         &claims,
-        &EncodingKey::from_secret(std::env::var("JWT_SECRET").unwrap().as_bytes()),
+        &EncodingKey::from_secret(jwt_secret().as_bytes()),
     )
-    .unwrap()
+    .map_err(AppError::from)
 }
 
-fn validate_token(token: String) -> Result<Claims, Error> {
+fn validate_token(token: &str) -> Result<Claims, AppError> {
     let data = decode::<Claims>(
         token,
-        &DecodingKey::from_secret(std::env::var("JWT_SECRET").unwrap().as_bytes()),
+        &DecodingKey::from_secret(jwt_secret().as_bytes()),
         &Validation::new(jsonwebtoken::Algorithm::HS256),
     )?;
 
     Ok(data.claims)
 }
 
-pub fn extract_token(headers: &HeaderMap) -> Result<Claims, (StatusCode, &'static str)> {
+pub fn authenticate(headers: &HeaderMap) -> Result<Claims, AppError> {
     let auth_header = headers
         .get("Authorization")
         .and_then(|v| v.to_str().ok())
-        .ok_or((StatusCode::UNAUTHORIZED, "Missing Authorization header."))?;
+        .ok_or(AppError::Unauthorized("Missing Authorization header."))?;
 
     let token = auth_header
         .strip_prefix("Bearer ")
-        .ok_or((StatusCode::UNAUTHORIZED, "Invalid Authorization format."))?;
+        .ok_or(AppError::Unauthorized("Invalid Authorization format."))?;
 
-    validate_token(token.into())
-        .map_err(|_| (StatusCode::UNAUTHORIZED, "Invalid or expired token."))
-}
-
-pub fn extract_claims(headers: &HeaderMap) -> Result<Claims, String> {
-    let auth_header = headers
-        .get("Authorization")
-        .and_then(|v| v.to_str().ok())
-        .ok_or(String::from("Missing Authorization header."))?;
-
-    let token = auth_header
-        .strip_prefix("Bearer ")
-        .ok_or(String::from("Invalid Authorization format."))?;
-
-    validate_token(String::from(token)).map_err(|_| String::from("Invalid or expired token."))
+    validate_token(token)
 }
 
 pub async fn login(
     State(db_pool): State<PgPool>,
     Json(body): Json<LoginRequest>,
-) -> impl IntoResponse + Debug {
-    let user = db::users::get_user_by_email(&db_pool, &body.email).await;
+) -> Result<Json<LoginResponse>, AppError> {
+    let user = db::users::get_user_by_email(&db_pool, &body.email).await?;
 
-    let user = match user {
-        Ok(u) => u,
-        Err(_) => return (StatusCode::UNAUTHORIZED, "Invalid credentials.").into_response(),
-    };
-
-    let valid = bcrypt::verify(&body.password, &user.password).unwrap_or(false);
+    let valid = bcrypt::verify(&body.password, &user.password)
+        .unwrap_or(false);
     if !valid {
-        return (StatusCode::UNAUTHORIZED, "Invalid credentials.").into_response();
+        return Err(AppError::Unauthorized("Invalid credentials."));
     }
 
-    let token = generate_token(&user.user_id.to_string(), &user.is_admin);
-    Json(LoginResponse { token }).into_response()
+    let token = generate_token(user.user_id, user.is_admin)?;
+    
+    Ok(Json(LoginResponse { token }))
 }
 
 pub async fn signup(
     State(db_pool): State<PgPool>,
     Json(body): Json<SignupRequest>,
-) -> impl IntoResponse + Debug {
-    if !valid_email(&body.email[..])
-        || !valid_password(&body.password[..])
-        || !valid_tag(&body.tag[..])
+) -> Result<Json<LoginResponse>, AppError> {
+    if !valid_email(&body.email)
+        || !valid_password(&body.password)
+        || !valid_user_tag(&body.tag)
+        || !valid_name(&body.name)
     {
-        return (StatusCode::BAD_REQUEST, "Invalid values.").into_response();
+        return Err(AppError::BadRequest("Invalid values."));
     }
-    match &body.bio {
-        Some(b) => {
-            if !valid_bio(&b[..]) {
-                return (StatusCode::BAD_REQUEST, "Invalid bio.").into_response()
-            }
-        },
-        None => {}
+    if let Some(bio) = &body.bio {
+        if !valid_bio(bio) {
+            return Err(AppError::BadRequest("Invalid bio."));
+        }
     }
 
-    match db::utils::check_exists_email(&db_pool, &body.email).await {
-        Ok(true) => {
-            return (StatusCode::BAD_REQUEST, "Email already registered.").into_response();
-        }
-        Err(_) => {
-            return (StatusCode::INTERNAL_SERVER_ERROR, "Database error.").into_response();
-        }
-        Ok(false) => {}
-    }
+    let hashed_password = bcrypt::hash(&body.password, bcrypt::DEFAULT_COST)
+        .map_err(|_| AppError::Internal("Error at signing up."))?;
 
-    match db::utils::check_exists_tag(&db_pool, &body.tag).await {
-        Ok(true) => {
-            return (StatusCode::BAD_REQUEST, "Tag already exists.").into_response();
-        }
-        Err(_) => {
-            return (StatusCode::INTERNAL_SERVER_ERROR, "Database error.").into_response();
-        }
-        Ok(false) => {}
-    }
-
-    let hashed_password: String = bcrypt::hash(&body.password, bcrypt::DEFAULT_COST).unwrap();
-
-    match db::users::create_user(
+    let rec = db::users::create_user(
         &db_pool,
         &body.name,
         &body.tag,
@@ -174,20 +140,15 @@ pub async fn signup(
         body.bio.as_deref(),
     )
     .await
-    {
-        Ok(_) => {
-            return login(
-                State(db_pool),
-                Json(LoginRequest {
-                    email: body.email,
-                    password: body.password,
-                }),
-            )
-            .await
-            .into_response();
-        }
-        Err(_) => {
-            return (StatusCode::INTERNAL_SERVER_ERROR, "Could not create user.").into_response();
-        }
-    }
+    .map_err(|e| match &e {
+        sqlx::Error::Database(db_err) => match db_err.constraint() {
+            Some("users_email_key") => AppError::Conflict("Email already registered."),
+            Some("users_tag_key") => AppError::Conflict("Tag already exists."),
+            _ => e.into(),
+        },
+        _ => e.into(), 
+    })?;
+
+    let token = generate_token(rec.user_id, rec.is_admin)?;
+    Ok(Json(LoginResponse { token }))
 }

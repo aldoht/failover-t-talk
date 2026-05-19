@@ -4,13 +4,12 @@ use axum::{
     Json,
     extract::{Path, State},
     http::HeaderMap,
-    response::IntoResponse,
 };
 use reqwest::StatusCode;
 use serde::{Deserialize, Serialize};
-use sqlx::PgPool;
+use sqlx::{PgPool};
 
-use crate::auth::{Claims, extract_token};
+use crate::{auth::authenticate, errors::AppError};
 use crate::db;
 
 #[derive(Debug, Serialize)]
@@ -19,6 +18,17 @@ pub struct UserResponse {
     pub tag: String,
     pub profile_picture_url: Option<String>,
     pub bio: Option<String>
+}
+
+impl From<db::users::UserRecord> for UserResponse {
+    fn from(value: db::users::UserRecord) -> Self {
+        UserResponse {
+            name: value.name,
+            tag: value.tag,
+            profile_picture_url: value.profile_picture_url,
+            bio: value.bio,
+        }
+    }
 }
 
 #[derive(Deserialize)]
@@ -34,123 +44,59 @@ pub struct FollowRequest {
 pub async fn user_by_tag(
     State(db_pool): State<PgPool>,
     Path(tag): Path<String>,
-) -> impl IntoResponse + Debug {
-    let user = db::users::get_user_by_tag(&db_pool, &tag).await;
+) -> Result<Json<UserResponse>, AppError> {
+    let user = db::users::get_user_by_tag(&db_pool, &tag).await?;
 
-    let user = match user {
-        Ok(u) => u,
-        Err(_) => return (StatusCode::NOT_FOUND, "User with tag not found.").into_response(),
-    };
-
-    Json(UserResponse {
-        name: user.name,
-        tag: user.tag,
-        profile_picture_url: user.profile_picture_url,
-        bio: user.bio,
-    })
-    .into_response()
+    Ok(Json(user.into()))
 }
 
-// Check if user already follows target
 pub async fn follow_user(
     State(db_pool): State<PgPool>,
     headers: HeaderMap,
     Json(body): Json<FollowRequest>,
-) -> impl IntoResponse + Debug {
-    let claims: Claims = match extract_token(&headers) {
-        Ok(c) => c,
-        Err(e) => return e.into_response(),
-    };
-    let user_id: uuid::Uuid = match uuid::Uuid::parse_str(&claims.sub[..]) {
-        Ok(id) => id,
-        Err(_) => {
-            return (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                "Could not retrieve user's ID.",
-            )
-                .into_response();
-        }
-    };
-    let user_follows = db::users::get_user_by_tag(&db_pool, &body.follows_tag).await;
+) -> Result<(StatusCode, &'static str), AppError> {
+    let claims = authenticate(&headers)?;
+    let user_follows = db::users::get_user_by_tag(&db_pool, &body.follows_tag).await?;
 
-    let user_follows = match user_follows {
-        Ok(u) => {
-            if u.user_id == user_id {
-                return (StatusCode::BAD_REQUEST, "Users can't follow themselves").into_response();
-            }
-            u
-        }
-        Err(_) => return (StatusCode::NOT_FOUND, "User with tag not found.").into_response(),
-    };
+    db::users::create_follow(&db_pool, &claims.sub, &user_follows.user_id)
+        .await
+        .map_err(|e| match e {
+            sqlx::Error::Database(db_err) if db_err.constraint() == Some("followers_no_self_follow") => 
+                AppError::BadRequest("Users can't follow themselves."),
+            sqlx::Error::Database(db_err) if db_err.constraint() == Some("followers_unique") => 
+                AppError::Conflict("Already following this user."),
+            _ => AppError::Internal("Error while creating follow."),
+        })?;
 
-    match db::users::create_follow(&db_pool, &user_id, &user_follows.user_id).await {
-        Ok(_) => (StatusCode::OK, "Created follow successfully.").into_response(),
-        Err(_) => (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            "Error while creating follow in database.",
-        )
-            .into_response(),
-    }
+    Ok((StatusCode::CREATED, "Created follow successfully."))
 }
 
 pub async fn user_follows(
     State(db_pool): State<PgPool>,
     Path(tag): Path<String>,
-) -> impl IntoResponse + Debug {
-    let user_follows = db::users::get_user_follows(&db_pool, &tag).await;
+) -> Result<Json<Vec<UserResponse>>, AppError> {
+    let _user = db::users::get_user_by_tag(&db_pool, &tag).await?;
+    let users = db::users::get_user_follows(&db_pool, &tag).await?;
 
-    let users: Vec<UserResponse> = match user_follows {
-        Ok(users) => {
-            let mut response: Vec<UserResponse> = Vec::new();
-            for user in users.iter() {
-                response.push(UserResponse {
-                    name: user.name.clone(),
-                    tag: user.tag.clone(),
-                    profile_picture_url: user.profile_picture_url.clone(),
-                    bio: user.bio.clone(),
-                });
-            }
-            response
-        }
-        Err(_) => {
-            return (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                "Error while getting user's follows.",
-            )
-                .into_response();
-        }
-    };
+    let response: Vec<UserResponse> = users
+        .into_iter()
+        .map(UserResponse::from)
+        .collect();
 
-    Json(users).into_response()
+    Ok(Json(response))
 }
 
 pub async fn user_followed_by(
     State(db_pool): State<PgPool>,
     Path(tag): Path<String>,
-) -> impl IntoResponse + Debug {
-    let user_following = db::users::get_user_followed_by(&db_pool, &tag).await;
+) -> Result<Json<Vec<UserResponse>>, AppError> {
+    let _user = db::users::get_user_by_tag(&db_pool, &tag).await?;
+    let user_following = db::users::get_user_followed_by(&db_pool, &tag).await?;
 
-    let users: Vec<UserResponse> = match user_following {
-        Ok(users) => {
-            let mut response: Vec<UserResponse> = Vec::new();
-            for user in users.iter() {
-                response.push(UserResponse {
-                    name: user.name.clone(),
-                    tag: user.tag.clone(),
-                    profile_picture_url: user.profile_picture_url.clone(),
-                    bio: user.bio.clone(),
-                });
-            }
-            response
-        }
-        Err(_) => {
-            return (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                "Error while getting user's follows.",
-            )
-                .into_response();
-        }
-    };
+    let response: Vec<UserResponse> = user_following
+        .into_iter()
+        .map(UserResponse::from)
+        .collect();
 
-    Json(users).into_response()
+    Ok(Json(response))
 }

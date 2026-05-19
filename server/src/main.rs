@@ -1,3 +1,5 @@
+use std::sync::LazyLock;
+
 use axum::{Json, Router, routing::{get, post}};
 use tower::ServiceBuilder;
 use tower_http::{cors::{CorsLayer, Any}};
@@ -5,16 +7,17 @@ use prometheus::{Counter, Encoder, TextEncoder, register_counter};
 use serde::Serialize;
 use tokio::net::TcpListener;
 
+use crate::auth::init_jwt_secret;
+
 mod db;
 mod auth;
 mod utils;
 mod endpoints;
+mod errors;
 
-lazy_static::lazy_static! {
-    static ref REQUEST_COUNTER: Counter = register_counter!(
-        "http_requests_total", "Total HTTP requests"
-    ).unwrap();
-}
+static REQUEST_COUNTER: LazyLock<Counter> = LazyLock::new(|| {
+    register_counter!("http_requests_total", "Total HTTP requests").unwrap()
+});
 
 #[derive(Serialize)]
 struct StatusResponse {
@@ -26,6 +29,7 @@ struct StatusResponse {
 async fn main() {
     dotenvy::dotenv().ok();
     let db_pool = db::utils::create_db_pool().await;
+    init_jwt_secret();
 
     let port: u16 = std::env::var("PORT")
         .unwrap_or("8080".into())
@@ -54,7 +58,7 @@ async fn main() {
         .route("/follow", post(endpoints::users::follow_user))
         .route("/posts", post(endpoints::posts::create_post))
         .route("/posts/{tag}", get(endpoints::posts::get_posts_by_tag))
-        .route("/posts/{id}", get(endpoints::posts::get_post_by_id))
+        .route("/post/{id}", get(endpoints::posts::get_post_by_id))
         .layer(middleware)
         .with_state(db_pool);
     let listener: TcpListener = TcpListener::bind(format!("{host}:{port}")).await.unwrap();

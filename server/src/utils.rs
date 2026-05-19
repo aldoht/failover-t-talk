@@ -1,4 +1,5 @@
 use std::sync::LazyLock;
+use url::Url;
 
 use regex::Regex;
 
@@ -23,7 +24,7 @@ pub fn valid_password(password: &str) -> bool {
 }
 
 // Max 15 chars
-pub fn valid_tag(tag: &str) -> bool {
+pub fn valid_user_tag(tag: &str) -> bool {
     tag.chars().count() <= 15 && RE_TAG.is_match(tag)
 }
 
@@ -32,9 +33,73 @@ pub fn valid_name(name: &str) -> bool {
     !name.is_empty() && name.chars().count() <= 30 && RE_NAME.is_match(name)
 }
 
-// Max 500 chars; remove later since it was moved from VARCHAR to TEXT
-pub fn valid_url(url: &str) -> bool {
-    !url.is_empty() && url.chars().count() <= 500
+pub fn valid_url(input: &str) -> bool {
+    if input.is_empty() || input.len() > 2048 {
+        return false;
+    }
+
+    let url = match Url::parse(input) {
+        Ok(u) => u,
+        Err(_) => return false,
+    };
+
+    if !matches!(url.scheme(), "http" | "https") {
+        return false;
+    }
+
+    let host = match url.host_str() {
+        Some(h) => h,
+        None => return false,
+    };
+
+    if is_blocked_host(host) {
+        return false;
+    }
+
+    if let Some(port) = url.port() {
+        if port != 80 && port != 443 {
+            return false;
+        }
+    }
+
+    true
+}
+
+fn is_blocked_host(host: &str) -> bool {
+    let host = host.to_ascii_lowercase();
+
+    // Hostnames peligrosos
+    const BLOCKED_NAMES: &[&str] = &[
+        "localhost",
+        "metadata.google.internal",
+        "metadata",
+    ];
+    if BLOCKED_NAMES.contains(&host.as_str()) {
+        return true;
+    }
+
+    // IPs literales: bloquear rangos privados, loopback, link-local
+    if let Ok(ip) = host.parse::<std::net::IpAddr>() {
+        return match ip {
+            std::net::IpAddr::V4(v4) => {
+                v4.is_loopback()       // 127.0.0.0/8
+                || v4.is_private()      // 10/8, 172.16/12, 192.168/16
+                || v4.is_link_local()   // 169.254/16 (incluye AWS metadata 169.254.169.254)
+                || v4.is_unspecified()  // 0.0.0.0
+                || v4.is_broadcast()
+                || v4.octets()[0] == 0  // 0.0.0.0/8
+            }
+            std::net::IpAddr::V6(v6) => {
+                v6.is_loopback()
+                || v6.is_unspecified()
+                // Bloquea fc00::/7 (ULA) y fe80::/10 (link-local) por prefijo
+                || (v6.segments()[0] & 0xfe00) == 0xfc00
+                || (v6.segments()[0] & 0xffc0) == 0xfe80
+            }
+        };
+    }
+
+    false
 }
 
 // Max 160 chars

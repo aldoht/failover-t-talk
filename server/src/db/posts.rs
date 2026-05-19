@@ -1,6 +1,6 @@
 use chrono::{DateTime, Utc};
 use serde::Serialize;
-use sqlx::{PgPool, Postgres};
+use sqlx::{PgPool};
 use uuid::Uuid;
 
 #[derive(Debug, Serialize)]
@@ -14,8 +14,8 @@ pub struct PostRecord {
 pub async fn create_post(
     db_pool: &PgPool,
     user_id: &uuid::Uuid,
-    text: &String,
-) -> anyhow::Result<PostRecord> {
+    text: &str,
+) -> Result<PostRecord, sqlx::Error> {
     let rec: PostRecord = sqlx::query_as!(
         PostRecord,
         r#"
@@ -34,8 +34,8 @@ pub async fn create_post(
 
 pub async fn get_posts_by_tag(
     db_pool: &PgPool,
-    tag: &String,
-) -> anyhow::Result<Vec<PostRecord>> {
+    tag: &str,
+) -> Result<Vec<PostRecord>, sqlx::Error> {
     let posts: Vec<PostRecord> = sqlx::query_as!(
         PostRecord,
         r#"
@@ -72,7 +72,7 @@ pub async fn get_post_by_id(
 pub async fn get_post_like_count(
     db_pool: &PgPool,
     post_id: &Uuid,
-) -> anyhow::Result<i64> {
+) -> Result<i64, sqlx::Error> {
     let count: i64 = sqlx::query_scalar!(
         "SELECT COUNT(*) FROM likes WHERE post_id = $1",
         post_id

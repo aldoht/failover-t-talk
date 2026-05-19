@@ -10,44 +10,30 @@ pub struct MediaRecord {
     pub comment_id: Option<uuid::Uuid>,
 }
 
+pub enum MediaTarget {
+    Post(Uuid),
+    Comment(Uuid),
+}
+
 pub async fn create_media(
     db_pool: &PgPool,
-    url: &String,
-    post_id: &Option<uuid::Uuid>,
-    comment_id: &Option<uuid::Uuid>,
-) -> anyhow::Result<MediaRecord> {
-    let rec = match post_id {
-        Some(id) => {
-            sqlx::query_as!(
-                MediaRecord,
-                r#"
-            INSERT INTO media (url, post_id)
-            VALUES ($1, $2)
-            RETURNING media_id, url, post_id, comment_id
-            "#,
-                url,
-                id,
-            )
-            .fetch_one(db_pool)
-            .await?
-        }
-        None => {
-            sqlx::query_as!(
-                MediaRecord,
-                r#"
-            INSERT INTO media (url, post_id)
-            VALUES ($1, $2)
-            RETURNING media_id, url, post_id, comment_id
-            "#,
-                url,
-                comment_id.expect("Err"),
-            )
-            .fetch_one(db_pool)
-            .await?
-        }
-    };
-
-    Ok(rec)
+    url: &str,
+    target: MediaTarget,
+) -> Result<MediaRecord, sqlx::Error> {
+    match target {
+        MediaTarget::Post(post_id) => sqlx::query_as!(
+            MediaRecord,
+            r#"INSERT INTO media (url, post_id) VALUES ($1, $2)
+                RETURNING media_id, url, post_id, comment_id"#,
+            url, post_id,
+        ).fetch_one(db_pool).await,
+        MediaTarget::Comment(comment_id) => sqlx::query_as!(
+            MediaRecord,
+            r#"INSERT INTO media (url, comment_id) VALUES ($1, $2)
+                RETURNING media_id, url, post_id, comment_id"#,
+            url, comment_id,
+        ).fetch_one(db_pool).await,
+    }
 }
 
 pub async fn get_media_by_post_id(

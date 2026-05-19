@@ -2,7 +2,7 @@ use serde::Serialize;
 use sqlx::PgPool;
 use uuid::Uuid;
 
-#[derive(Debug, Serialize)]
+#[derive(Debug)]
 pub struct UserRecord {
     pub user_id: uuid::Uuid,
     pub name: String,
@@ -21,20 +21,7 @@ pub struct FollowersRecord {
     pub followee_id: uuid::Uuid,
 }
 
-pub async fn get_users(db_pool: &PgPool) -> anyhow::Result<Vec<UserRecord>> {
-    let rec: Vec<UserRecord> = sqlx::query_as!(
-        UserRecord,
-        r#"
-        SELECT user_id, name, tag, email, password, is_admin, profile_picture_url, bio FROM users;
-        "#
-    )
-    .fetch_all(db_pool)
-    .await?;
-
-    Ok(rec)
-}
-
-pub async fn get_user_by_email(db_pool: &PgPool, email: &String) -> anyhow::Result<UserRecord> {
+pub async fn get_user_by_email(db_pool: &PgPool, email: &str) -> Result<UserRecord, sqlx::Error> {
     let rec: UserRecord = sqlx::query_as!(
         UserRecord,
         r#"
@@ -49,7 +36,7 @@ pub async fn get_user_by_email(db_pool: &PgPool, email: &String) -> anyhow::Resu
     Ok(rec)
 }
 
-pub async fn get_user_by_id(db_pool: &PgPool, id: Uuid) -> anyhow::Result<UserRecord> {
+pub async fn get_user_by_id(db_pool: &PgPool, id: Uuid) -> Result<UserRecord, sqlx::Error> {
     let rec: UserRecord = sqlx::query_as!(
         UserRecord,
         r#"
@@ -64,7 +51,7 @@ pub async fn get_user_by_id(db_pool: &PgPool, id: Uuid) -> anyhow::Result<UserRe
     Ok(rec)
 }
 
-pub async fn get_user_by_tag(db_pool: &PgPool, tag: &String) -> anyhow::Result<UserRecord> {
+pub async fn get_user_by_tag(db_pool: &PgPool, tag: &str) -> Result<UserRecord, sqlx::Error> {
     let rec: UserRecord = sqlx::query_as!(
         UserRecord,
         r#"
@@ -79,7 +66,8 @@ pub async fn get_user_by_tag(db_pool: &PgPool, tag: &String) -> anyhow::Result<U
     Ok(rec)
 }
 
-pub async fn get_user_follows(db_pool: &PgPool, tag: &String) -> anyhow::Result<Vec<UserRecord>> {
+// N + 1
+pub async fn get_user_follows(db_pool: &PgPool, tag: &str) -> Result<Vec<UserRecord>, sqlx::Error> {
     let user: UserRecord = get_user_by_tag(db_pool, tag).await?;
 
     let recs: Vec<UserRecord> = sqlx::query_as!(
@@ -98,7 +86,8 @@ pub async fn get_user_follows(db_pool: &PgPool, tag: &String) -> anyhow::Result<
     Ok(recs)
 }
 
-pub async fn get_user_followed_by(db_pool: &PgPool, tag: &String) -> anyhow::Result<Vec<UserRecord>> {
+// N + 1
+pub async fn get_user_followed_by(db_pool: &PgPool, tag: &str) -> Result<Vec<UserRecord>, sqlx::Error> {
     let user: UserRecord = get_user_by_tag(db_pool, tag).await?;
 
     let recs: Vec<UserRecord> = sqlx::query_as!(
@@ -119,13 +108,13 @@ pub async fn get_user_followed_by(db_pool: &PgPool, tag: &String) -> anyhow::Res
 
 pub async fn create_user(
     db_pool: &PgPool,
-    name: &String,
-    tag: &String,
-    email: &String,
-    password: &String,
+    name: &str,
+    tag: &str,
+    email: &str,
+    password: &str,
     profile_picture_url: Option<&str>,
     bio: Option<&str>,
-) -> anyhow::Result<UserRecord> {
+) -> Result<UserRecord, sqlx::Error> {
     let rec: UserRecord = sqlx::query_as!(
         UserRecord,
         r#"
@@ -148,9 +137,9 @@ pub async fn create_user(
 
 pub async fn create_follow(
     db_pool: &PgPool,
-    follower_id: &uuid::Uuid,
-    followee_id: &uuid::Uuid,
-) -> anyhow::Result<FollowersRecord> {
+    follower_id: &Uuid,
+    followee_id: &Uuid,
+) -> Result<FollowersRecord, sqlx::Error> {
     let rec: FollowersRecord = sqlx::query_as!(
         FollowersRecord,
         r#"
