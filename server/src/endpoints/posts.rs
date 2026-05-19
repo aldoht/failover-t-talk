@@ -116,3 +116,13 @@ pub async fn like_post(
     db::likes::create_like(&db_pool, MediaTarget::Post(id), &claims.sub).await?;
     Ok((StatusCode::CREATED, "Created like successfully."))
 }
+
+pub async fn remove_like_from_post(
+    State(db_pool): State<PgPool>,
+    claims: Claims,
+    Path(id): Path<Uuid>,
+) -> Result<StatusCode, AppError> {
+    let _post = db::posts::get_post_by_id(&db_pool, id).await?;
+    db::likes::delete_like(&db_pool, MediaTarget::Post(id), &claims.sub).await?;
+    Ok(StatusCode::NO_CONTENT)
+}

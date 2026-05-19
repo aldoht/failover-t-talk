@@ -40,3 +40,32 @@ pub async fn create_like(
 
     Ok(())
 }
+
+pub async fn delete_like(
+    db_pool: &PgPool,
+    target: MediaTarget,
+    user_id: &Uuid,
+) -> Result<(), AppError> {
+    match target {
+        MediaTarget::Post(post_id) => {
+            sqlx::query!(
+                "DELETE FROM likes WHERE user_id = $1 AND post_id = $2",
+                user_id,
+                post_id,
+            )
+            .execute(db_pool)
+            .await?
+        },
+        MediaTarget::Comment(comment_id) => {
+            sqlx::query!(
+                "DELETE FROM likes WHERE user_id = $1 AND comment_id = $2",
+                user_id,
+                comment_id,
+            )
+            .execute(db_pool)
+            .await?
+        }
+    };
+
+    Ok(())
+}

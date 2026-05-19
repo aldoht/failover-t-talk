@@ -61,6 +61,7 @@ async fn main() {
         .route("/posts/{tag}", get(endpoints::posts::get_posts_by_tag))
         .route("/post/{id}", get(endpoints::posts::get_post_by_id))
         .route("/post/{id}/like", post(endpoints::posts::like_post))
+        .route("/post/{id}/unlike", delete(endpoints::posts::remove_like_from_post))
         .layer(middleware)
         .with_state(db_pool);
     let listener: TcpListener = TcpListener::bind(format!("{host}:{port}")).await.unwrap();
