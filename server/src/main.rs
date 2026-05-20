@@ -75,7 +75,7 @@ async fn main() {
         .route("/post/{id}", get(endpoints::posts::get_post_by_id))
         .route("/post/{id}/like", post(endpoints::likes::like_post))
         .route("/post/{id}/unlike", delete(endpoints::likes::remove_like_from_post))
-        .route("/post/{id}/replies", get(endpoints::comments::get_post_comments))
+        .route("/post/{id}/replies", get(endpoints::comments::get_post_replies))
         .route("/comment/{id}", get(endpoints::comments::get_comment))
         .route("/comment/reply/{id}", post(endpoints::comments::reply_to_comment))
         .route("/comment/post/{id}", post(endpoints::comments::comment_on_post))

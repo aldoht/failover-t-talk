@@ -4,7 +4,7 @@ use url::Url;
 use regex::Regex;
 
 static RE_EMAIL: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r"^[\w\-\.]+@([\w\-]+\.)+[\w\-]{2,4}$").unwrap());
+    LazyLock::new(|| Regex::new(r"^[\w\-\.]+@([\w\-]+\.)+[\w\-]{2,24}$").unwrap());
 static RE_TAG: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"^[\w!]+$").unwrap());
 static RE_NAME: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"^[a-zA-Z\s]+$").unwrap());
 
@@ -104,5 +104,5 @@ fn is_blocked_host(host: &str) -> bool {
 
 // Max 160 chars
 pub fn valid_bio(bio: &str) -> bool {
-    !bio.chars().count() > 160
+    bio.chars().count() <= 160
 }

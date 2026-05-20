@@ -57,10 +57,9 @@ pub async fn user_by_tag(
 
 pub async fn follow_user(
     State(db_pool): State<PgPool>,
-    headers: HeaderMap,
+    claims: Claims,
     Json(body): Json<FollowRequest>,
 ) -> Result<(StatusCode, &'static str), AppError> {
-    let claims = authenticate(&headers)?;
     let user_follows = db::users::get_user_by_tag(&db_pool, &body.follows_tag).await?;
 
     db::users::create_follow(&db_pool, &claims.sub, &user_follows.user_id)

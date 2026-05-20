@@ -35,11 +35,9 @@ pub struct PostResponse {
 
 pub async fn create_post(
     State(db_pool): State<PgPool>,
-    headers: HeaderMap,
+    claims: Claims,
     Json(body): Json<PostRequest>,
 ) -> Result<(StatusCode, &'static str), AppError> {
-    let claims = authenticate(&headers)?;
-    
     if let Some(ref url) = body.url {
         if !utils::valid_url(url) {
             return Err(AppError::BadRequest("Invalid media URL."));
@@ -61,9 +59,7 @@ async fn create_post_response(
     user: &UserRecord,
     db_pool: &PgPool,
 ) -> Result<PostResponse, AppError> {
-    let like_count = db::likes::get_target_likes(&db_pool, &MediaTarget::Post(post.post_id))
-        .await
-        .unwrap_or(0);
+    let like_count = db::likes::get_target_likes(&db_pool, &MediaTarget::Post(post.post_id)).await?;
 
     let media_urls = db::media::get_target_media(db_pool, MediaTarget::Post(post.post_id))
         .await?

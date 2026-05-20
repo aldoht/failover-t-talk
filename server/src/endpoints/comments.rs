@@ -28,6 +28,27 @@ pub struct CommentResponse {
     pub like_count: i64,
 }
 
+async fn create_comment_with_media(db_pool: &PgPool, user_id: Uuid, target: MediaTarget, body: CreateCommentRequest) -> Result<(), AppError> {
+    if let Some(ref url) = body.url {
+        if !utils::valid_url(url) {
+            return Err(AppError::BadRequest("Invalid media URL."));
+        }
+    }
+    
+    let comment = db::comments::create_comment(
+        db_pool,
+        target,
+        &user_id,
+        &body.text,
+    ).await?;
+
+    if let Some(url) = body.url {
+        db::media::create_media(db_pool, &url, MediaTarget::Comment(comment.comment_id)).await?;
+    };
+
+    Ok(())
+}
+
 pub async fn comment_on_post(
     State(db_pool): State<PgPool>,
     claims: Claims,
@@ -35,21 +56,7 @@ pub async fn comment_on_post(
     Json(body): Json<CreateCommentRequest>,
 ) -> Result<(StatusCode, &'static str), AppError> {
     db::posts::get_post_by_id(&db_pool, post_id).await?;
-    if let Some(ref url) = body.url {
-        if !utils::valid_url(url) {
-            return Err(AppError::BadRequest("Invalid media URL."));
-        }
-    }
-    let comment = db::comments::create_comment(
-        &db_pool,
-        MediaTarget::Post(post_id),
-        &claims.sub,
-        &body.text,
-    ).await?;
-    
-    if let Some(url) = body.url {
-        db::media::create_media(&db_pool, &url, MediaTarget::Comment(comment.comment_id)).await?;
-    };
+    create_comment_with_media(&db_pool, claims.sub, MediaTarget::Post(post_id), body).await?;
     
     Ok((StatusCode::CREATED, "Created comment on post successfully."))
 }
@@ -60,21 +67,8 @@ pub async fn reply_to_comment(
     Path(comment_id): Path<Uuid>,
     Json(body): Json<CreateCommentRequest>,
 ) -> Result<(StatusCode, &'static str), AppError> {
-    if let Some(ref url) = body.url {
-        if !utils::valid_url(url) {
-            return Err(AppError::BadRequest("Invalid media URL."));
-        }
-    }
-    let comment = db::comments::create_comment(
-        &db_pool,
-        MediaTarget::Comment(comment_id),
-        &claims.sub,
-        &body.text,
-    ).await?;
-    
-    if let Some(url) = body.url {
-        db::media::create_media(&db_pool, &url, MediaTarget::Comment(comment.comment_id)).await?;
-    };
+    db::comments::get_comment_by_id(&db_pool, comment_id).await?;
+    create_comment_with_media(&db_pool, claims.sub, MediaTarget::Comment(comment_id), body).await?;
     
     Ok((StatusCode::CREATED, "Created reply successfully."))
 }
@@ -119,32 +113,34 @@ pub async fn get_comment(
     Ok((StatusCode::OK, Json(response)))
 }
 
+async fn build_comment_responses(
+    db_pool: &PgPool,
+    comments: Vec<CommentRecord>,
+) -> Result<Vec<CommentResponse>, AppError> {
+    let mut response = Vec::with_capacity(comments.len());
+    for comment in &comments {
+        let author = db::users::get_user_by_id(db_pool, comment.user_id).await?;
+        response.push(create_comment_response(comment, &author, db_pool).await?);
+    }
+    Ok(response)
+}
+
 pub async fn get_comment_replies(
     State(db_pool): State<PgPool>,
     Path(comment_id): Path<Uuid>,
 ) -> Result<(StatusCode, Json<Vec<CommentResponse>>), AppError> {
-    let comment = db::comments::get_comment_by_id(&db_pool, comment_id).await?;
-    let user = db::users::get_user_by_id(&db_pool, comment.user_id).await?;
+    db::comments::get_comment_by_id(&db_pool, comment_id).await?;
     let comments = db::comments::get_target_comments(&db_pool, MediaTarget::Comment(comment_id)).await?;
-    
-    let mut response = Vec::with_capacity(comments.len());
-    for comment in &comments {
-        response.push(create_comment_response(comment, &user, &db_pool).await?);
-    }
+    let response = build_comment_responses(&db_pool, comments).await?;
     Ok((StatusCode::OK, Json(response)))
 }
 
-pub async fn get_post_comments(
+pub async fn get_post_replies(
     State(db_pool): State<PgPool>,
     Path(post_id): Path<Uuid>,
 ) -> Result<(StatusCode, Json<Vec<CommentResponse>>), AppError> {
-    let post = db::posts::get_post_by_id(&db_pool, post_id).await?;
-    let user = db::users::get_user_by_id(&db_pool, post.user_id).await?;
+    db::posts::get_post_by_id(&db_pool, post_id).await?;
     let comments = db::comments::get_target_comments(&db_pool, MediaTarget::Post(post_id)).await?;
-    
-    let mut response = Vec::with_capacity(comments.len());
-    for comment in &comments {
-        response.push(create_comment_response(comment, &user, &db_pool).await?);
-    }
+    let response = build_comment_responses(&db_pool, comments).await?;
     Ok((StatusCode::OK, Json(response)))
 }
