@@ -29,7 +29,7 @@ pub struct PostResponse {
     pub user_profile_pic_url: Option<String>,
     pub text: String,
     pub created_at: DateTime<Utc>,
-    pub media_urls: Option<Vec<String>>,
+    pub media_urls: Vec<String>,
     pub like_count: i64,
 }
 
@@ -61,12 +61,15 @@ async fn create_post_response(
     user: &UserRecord,
     db_pool: &PgPool,
 ) -> Result<PostResponse, AppError> {
-    let like_count = db::posts::get_post_like_count(&db_pool, &post.post_id)
+    let like_count = db::likes::get_target_likes(&db_pool, &MediaTarget::Post(post.post_id))
         .await
         .unwrap_or(0);
 
-    let media = db::media::get_media_by_post_id(db_pool, &post.post_id).await?;
-    let media_urls = if media.is_empty() { None } else { Some(media.into_iter().map(|m| m.url).collect()) };
+    let media_urls = db::media::get_target_media(db_pool, MediaTarget::Post(post.post_id))
+        .await?
+        .into_iter()
+        .map(|m| m.url)
+        .collect();
 
     Ok(PostResponse {
         post_id: post.post_id,

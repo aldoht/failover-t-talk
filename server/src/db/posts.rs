@@ -68,18 +68,3 @@ pub async fn get_post_by_id(
 
     Ok(post)
 }
-
-pub async fn get_post_like_count(
-    db_pool: &PgPool,
-    post_id: &Uuid,
-) -> Result<i64, sqlx::Error> {
-    let count: i64 = sqlx::query_scalar!(
-        "SELECT COUNT(*) FROM likes WHERE post_id = $1",
-        post_id
-    )
-    .fetch_one(db_pool)
-    .await?
-    .unwrap_or(0);
-
-    Ok(count)
-}

@@ -69,3 +69,31 @@ pub async fn delete_like(
 
     Ok(())
 }
+
+pub async fn get_target_likes(
+    db_pool: &PgPool,
+    target: &MediaTarget,
+) -> Result<i64, sqlx::Error> {
+    let count: i64 = match target {
+        MediaTarget::Post(post_id) => {
+            sqlx::query_scalar!(
+                "SELECT COUNT(*) FROM likes WHERE post_id = $1",
+                post_id
+            )
+            .fetch_one(db_pool)
+            .await?
+            .unwrap_or(0)
+        },
+        MediaTarget::Comment(comment_id) => {
+            sqlx::query_scalar!(
+                "SELECT COUNT(*) FROM likes WHERE comment_id = $1",
+                comment_id
+            )
+            .fetch_one(db_pool)
+            .await?
+            .unwrap_or(0)
+        }
+    };
+
+    Ok(count)
+}

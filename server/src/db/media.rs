@@ -36,20 +36,36 @@ pub async fn create_media(
     }
 }
 
-pub async fn get_media_by_post_id(
+pub async fn get_target_media(
     db_pool: &PgPool,
-    post_id: &Uuid,
+    target: MediaTarget,
 ) -> Result<Vec<MediaRecord>, sqlx::Error> {
-    let rec = sqlx::query_as!(
-        MediaRecord,
-        r#"
-        SELECT media_id, url, post_id, comment_id FROM media AS m
-        WHERE post_id = $1;
-        "#,
-        post_id
-    )
-    .fetch_all(db_pool)
-    .await?;
+    let rec: Vec<MediaRecord> = match target {
+        MediaTarget::Post(post_id) => {
+            sqlx::query_as!(
+                MediaRecord,
+                r#"
+                SELECT media_id, url, post_id, comment_id FROM media AS m
+                WHERE post_id = $1;
+                "#,
+                post_id
+            )
+            .fetch_all(db_pool)
+            .await?
+        },
+        MediaTarget::Comment(comment_id) => {
+            sqlx::query_as!(
+                MediaRecord,
+                r#"
+                SELECT media_id, url, post_id, comment_id FROM media AS m
+                WHERE comment_id = $1;
+                "#,
+                comment_id
+            )
+            .fetch_all(db_pool)
+            .await?
+        },
+    };
 
     Ok(rec)
 }
