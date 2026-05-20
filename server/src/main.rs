@@ -2,10 +2,11 @@ use std::sync::LazyLock;
 
 use axum::{Json, Router, routing::{delete, get, post}};
 use tower::ServiceBuilder;
-use tower_http::{cors::{CorsLayer, Any}};
+use tower_http::{cors::{Any, CorsLayer}, trace::{DefaultMakeSpan, DefaultOnResponse, TraceLayer}};
 use prometheus::{Counter, Encoder, TextEncoder, register_counter};
 use serde::Serialize;
 use tokio::net::TcpListener;
+use tracing::Level;
 use tracing_subscriber::{EnvFilter, fmt};
 
 use crate::auth::init_jwt_secret;
@@ -28,10 +29,6 @@ struct StatusResponse {
 
 #[tokio::main]
 async fn main() {
-    fmt()
-    .with_env_filter(EnvFilter::try_from_default_env()
-        .unwrap_or_else(|_| EnvFilter::new("info")))
-    .init();
     dotenvy::dotenv().ok();
     let db_pool = db::utils::create_db_pool().await;
     init_jwt_secret();
@@ -49,7 +46,18 @@ async fn main() {
         .allow_headers(Any)
         .allow_origin(Any);
     let middleware = ServiceBuilder::new()
+        .layer(
+            TraceLayer::new_for_http()
+                .make_span_with(DefaultMakeSpan::new().level(Level::INFO))
+                .on_response(DefaultOnResponse::new().level(Level::INFO))
+        )
         .layer(cors);
+
+    fmt()
+    .with_env_filter(EnvFilter::try_from_default_env()
+        .unwrap_or_else(|_| EnvFilter::new("info,tower_http=info")))
+    .init();
+
     let app: Router = Router::new()
         .route("/", get(root))
         .route("/health", get(health))

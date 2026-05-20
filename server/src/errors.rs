@@ -14,7 +14,7 @@ impl From<sqlx::Error> for AppError {
         match e {
             sqlx::Error::RowNotFound => AppError::NotFound("Resource not found."),
             other => {
-                // tracing::error!(error = ?other, "database error");
+                tracing::error!(error = ?other, "database error");
                 AppError::Internal("Internal error.")
             }
         }
@@ -31,7 +31,7 @@ impl From<jsonwebtoken::errors::Error> for AppError {
             | ErrorKind::InvalidIssuer
             | ErrorKind::InvalidAudience => AppError::Unauthorized("Invalid token."),
             _ => {
-                // tracing::error!(error = ?e, "jwt error");
+                tracing::error!(error = ?e, "jwt error");
                 AppError::Internal("Could not process token.")
             }
         }
