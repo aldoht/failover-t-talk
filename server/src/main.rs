@@ -67,11 +67,13 @@ async fn main() {
         .route("/post/{id}", get(endpoints::posts::get_post_by_id))
         .route("/post/{id}/like", post(endpoints::likes::like_post))
         .route("/post/{id}/unlike", delete(endpoints::likes::remove_like_from_post))
+        .route("/post/{id}/replies", get(endpoints::comments::get_post_comments))
         .route("/comment/{id}", get(endpoints::comments::get_comment))
         .route("/comment/reply/{id}", post(endpoints::comments::reply_to_comment))
         .route("/comment/post/{id}", post(endpoints::comments::comment_on_post))
         .route("/comment/{id}/like", post(endpoints::likes::like_comment))
         .route("/comment/{id}/unlike", delete(endpoints::likes::remove_like_from_comment))
+        .route("/comment/{id}/replies", get(endpoints::comments::get_comment_replies))
         .layer(middleware)
         .with_state(db_pool);
     let listener: TcpListener = TcpListener::bind(format!("{host}:{port}")).await.unwrap();

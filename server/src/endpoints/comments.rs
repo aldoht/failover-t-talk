@@ -118,3 +118,33 @@ pub async fn get_comment(
     
     Ok((StatusCode::OK, Json(response)))
 }
+
+pub async fn get_comment_replies(
+    State(db_pool): State<PgPool>,
+    Path(comment_id): Path<Uuid>,
+) -> Result<(StatusCode, Json<Vec<CommentResponse>>), AppError> {
+    let comment = db::comments::get_comment_by_id(&db_pool, comment_id).await?;
+    let user = db::users::get_user_by_id(&db_pool, comment.user_id).await?;
+    let comments = db::comments::get_target_comments(&db_pool, MediaTarget::Comment(comment_id)).await?;
+    
+    let mut response = Vec::with_capacity(comments.len());
+    for comment in &comments {
+        response.push(create_comment_response(comment, &user, &db_pool).await?);
+    }
+    Ok((StatusCode::OK, Json(response)))
+}
+
+pub async fn get_post_comments(
+    State(db_pool): State<PgPool>,
+    Path(post_id): Path<Uuid>,
+) -> Result<(StatusCode, Json<Vec<CommentResponse>>), AppError> {
+    let post = db::posts::get_post_by_id(&db_pool, post_id).await?;
+    let user = db::users::get_user_by_id(&db_pool, post.user_id).await?;
+    let comments = db::comments::get_target_comments(&db_pool, MediaTarget::Post(post_id)).await?;
+    
+    let mut response = Vec::with_capacity(comments.len());
+    for comment in &comments {
+        response.push(create_comment_response(comment, &user, &db_pool).await?);
+    }
+    Ok((StatusCode::OK, Json(response)))
+}

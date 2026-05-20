@@ -70,3 +70,31 @@ pub async fn create_comment(
 
     Ok(comment)
 }
+
+pub async fn get_target_comments(
+    pool: &PgPool,
+    target: MediaTarget,
+) -> Result<Vec<CommentRecord>, sqlx::Error> {
+    let comments = match target {
+        MediaTarget::Post(post_id) => {
+            sqlx::query_as!(
+                CommentRecord,
+                "SELECT * FROM comments WHERE post_id = $1 AND root_comment_id = comment_id ORDER BY created_at DESC",
+                post_id
+            )
+            .fetch_all(pool)
+            .await?
+        },
+        MediaTarget::Comment(comment_id) => {
+            sqlx::query_as!(
+                CommentRecord,
+                "SELECT * FROM comments WHERE parent_comment_id = $1 AND comment_id != $1 ORDER BY created_at DESC",
+                comment_id
+            )
+            .fetch_all(pool)
+            .await?
+        },
+    };
+
+    Ok(comments)
+}
