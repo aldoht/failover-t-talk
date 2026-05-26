@@ -1,58 +1,66 @@
+x-app-common: &app-common
+  build: ./server/
+  image: failover-t-talk-server:latest
+  restart: unless-stopped
+  environment:
+    PORT: ${PORT}
+    HOST: ${HOST}
+    DATABASE_URL: ${AWS_PSQL_URL}
+    JWT_SECRET: ${JWT_SECRET}
+  healthcheck:
+    test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:$$PORT/health || exit 1"]
+    interval: 10s
+    timeout: 3s
+    retries: 3
+    start_period: 10s
+  networks:
+    - internal
+
 services:
-  nginx:
-    image: nginx:alpine
-    ports:
-      - "80:80"
-    volumes:
-      - "./nginx.conf:/etc/nginx/nginx.conf"
-    depends_on:
-      - app1
-      - app2
-      - app3
-
   app1:
-    build: ./server/
-    environment:
-      PORT: "8080"
-    healthcheck:
-      test: ["CMD", "wget", "-q0-", "http://127.0.0.1:8080/health"]
-      interval: 10s
-      timeout: 3s
-      retries: 3
-
+    <<: *app-common
   app2:
-    build: ./server/
-    environment:
-      PORT: "8080"
-    healthcheck:
-      test: ["CMD", "wget", "-q0-", "http://127.0.0.1:8080/health"]
-      interval: 10s
-      timeout: 3s
-      retries: 3
-
+    <<: *app-common
   app3:
-    build: ./server/
-    environment:
-      PORT: "8080"
-    healthcheck:
-      test: ["CMD", "wget", "-q0-", "http://127.0.0.1:8080/health"]
-      interval: 10s
-      timeout: 3s
-      retries: 3
+    <<: *app-common
+
+  prometheus:
+    image: prom/prometheus
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:9090:9090"
+    volumes:
+      - "./prometheus.yml:/etc/prometheus/prometheus.yml:ro"
+      - "./data/prometheus:/prometheus"
+    networks:
+      - internal
 
   grafana:
     image: grafana/grafana
     restart: unless-stopped
     ports:
-      - "3000:3000"
+      - "127.0.0.1:3000:3000"
     environment:
-      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD}
     depends_on:
       - prometheus
-
-  prometheus:
-    image: prom/prometheus
-    ports:
-      - "9090:9090"
     volumes:
-      - "./prometheus.yml:/etc/prometheus/prometheus.yml:ro"
+      - "./data/grafana:/var/lib/grafana"
+    networks:
+      - internal
+  
+  web:
+    build: ./t-talk/
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      app1: { condition: service_healthy }
+      app2: { condition: service_healthy }
+      app3: { condition: service_healthy }
+    networks:
+      - internal
+
+networks:
+  internal:
+    driver: bridge

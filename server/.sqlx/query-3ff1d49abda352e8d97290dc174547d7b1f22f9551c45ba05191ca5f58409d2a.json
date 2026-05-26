@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n        INSERT INTO users (name, tag, email, password)\n        VALUES ($1, $2, $3, $4)\n        RETURNING user_id, name, tag, email, password, is_admin;\n        ",
+  "query": "\n        SELECT user_id, name, tag, email, password, is_admin, profile_picture_url, bio FROM users AS u\n        WHERE u.user_id = $1;\n        ",
   "describe": {
     "columns": [
       {
@@ -32,14 +32,21 @@
         "ordinal": 5,
         "name": "is_admin",
         "type_info": "Bool"
+      },
+      {
+        "ordinal": 6,
+        "name": "profile_picture_url",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 7,
+        "name": "bio",
+        "type_info": "Varchar"
       }
     ],
     "parameters": {
       "Left": [
-        "Varchar",
-        "Varchar",
-        "Varchar",
-        "Varchar"
+        "Uuid"
       ]
     },
     "nullable": [
@@ -48,8 +55,10 @@
       false,
       false,
       false,
-      false
+      false,
+      true,
+      true
     ]
   },
-  "hash": "b0541a03c2882fb22d918735e040c9f0e73a88905481150fda8be180c056fa39"
+  "hash": "3ff1d49abda352e8d97290dc174547d7b1f22f9551c45ba05191ca5f58409d2a"
 }
