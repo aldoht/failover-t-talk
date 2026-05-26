@@ -1,6 +1,6 @@
 use axum::{Json, extract::{Path, State}};
 use chrono::{DateTime, Utc};
-use reqwest::StatusCode;
+use axum::http::StatusCode;
 use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
 use uuid::Uuid;

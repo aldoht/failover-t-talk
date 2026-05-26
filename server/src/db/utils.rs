@@ -1,7 +1,7 @@
 use sqlx::PgPool;
 
 pub async fn create_db_pool() -> PgPool {
-    let url = std::env::var("AWS_PSQL_URL").expect("Database URL not set.");
+    let url = std::env::var("DATABASE_URL").expect("Database URL not set.");
     PgPool::connect(&url)
         .await
         .expect("Failed to connect to database.")

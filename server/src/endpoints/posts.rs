@@ -1,7 +1,7 @@
 use axum::{
     Json,
     extract::{Path, State},
-    http::{HeaderMap, StatusCode},
+    http::{StatusCode},
 };
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -9,7 +9,7 @@ use sqlx::PgPool;
 use uuid::Uuid;
 
 use crate::{
-    auth::{Claims, authenticate},
+    auth::{Claims},
     db::{self, media::MediaTarget, posts::PostRecord, users::UserRecord},
     errors::AppError,
     utils,

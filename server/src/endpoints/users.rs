@@ -2,14 +2,13 @@ use std::fmt::Debug;
 
 use axum::{
     Json,
-    extract::{Path, State, Query},
-    http::HeaderMap,
+    extract::{Path, State},
 };
-use reqwest::StatusCode;
-use serde::{Deserialize, Serialize};
+use axum::http::StatusCode;
+use serde::{Serialize};
 use sqlx::{PgPool};
 
-use crate::{auth::{Claims, authenticate}, errors::AppError};
+use crate::{auth::{Claims}, errors::AppError};
 use crate::db;
 
 #[derive(Debug, Serialize)]
@@ -31,21 +30,6 @@ impl From<db::users::UserRecord> for UserResponse {
     }
 }
 
-#[derive(Deserialize)]
-pub struct UserRequest {
-    pub tag: String,
-}
-
-#[derive(Deserialize)]
-pub struct FollowRequest {
-    pub follows_tag: String,
-}
-
-#[derive(Deserialize)]
-pub struct UnfollowParams {
-    pub tag: String,
-}
-
 pub async fn user_by_tag(
     State(db_pool): State<PgPool>,
     Path(tag): Path<String>,
@@ -58,9 +42,9 @@ pub async fn user_by_tag(
 pub async fn follow_user(
     State(db_pool): State<PgPool>,
     claims: Claims,
-    Json(body): Json<FollowRequest>,
+    Path(tag): Path<String>,
 ) -> Result<(StatusCode, &'static str), AppError> {
-    let user_follows = db::users::get_user_by_tag(&db_pool, &body.follows_tag).await?;
+    let user_follows = db::users::get_user_by_tag(&db_pool, &tag).await?;
 
     db::users::create_follow(&db_pool, &claims.sub, &user_follows.user_id)
         .await
@@ -78,9 +62,9 @@ pub async fn follow_user(
 pub async fn unfollow_user(
     State(db_pool): State<PgPool>,
     claims: Claims,
-    Query(params): Query<UnfollowParams>,
+    Path(tag): Path<String>,
 ) -> Result<StatusCode, AppError> {
-    let followed_user = db::users::get_user_by_tag(&db_pool, &params.tag).await?;
+    let followed_user = db::users::get_user_by_tag(&db_pool, &tag).await?;
     db::users::delete_follow(&db_pool, &claims.sub, &followed_user.user_id).await?;
 
     Ok(StatusCode::NO_CONTENT)

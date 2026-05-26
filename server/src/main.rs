@@ -2,7 +2,7 @@ use std::sync::LazyLock;
 
 use axum::{Json, Router, routing::{delete, get, post}};
 use tower::ServiceBuilder;
-use tower_http::{cors::{Any, CorsLayer}, trace::{DefaultMakeSpan, DefaultOnResponse, TraceLayer}};
+use tower_http::trace::{DefaultMakeSpan, DefaultOnResponse, TraceLayer};
 use prometheus::{Counter, Encoder, TextEncoder, register_counter};
 use serde::Serialize;
 use tokio::net::TcpListener;
@@ -41,17 +41,13 @@ async fn main() {
         .unwrap_or("0.0.0.0".into())
         .parse()
         .unwrap();
-    let cors: CorsLayer = CorsLayer::new()
-        .allow_methods(Any)
-        .allow_headers(Any)
-        .allow_origin(Any);
+    
     let middleware = ServiceBuilder::new()
         .layer(
             TraceLayer::new_for_http()
                 .make_span_with(DefaultMakeSpan::new().level(Level::INFO))
                 .on_response(DefaultOnResponse::new().level(Level::INFO))
-        )
-        .layer(cors);
+        );
 
     fmt()
     .with_env_filter(EnvFilter::try_from_default_env()
@@ -62,26 +58,26 @@ async fn main() {
         .route("/", get(root))
         .route("/health", get(health))
         .route("/metrics", get(metrics))
-        .route("/api/status", get(api_status))
-        .route("/signup", post(auth::signup))
-        .route("/login", post(auth::login))
-        .route("/users/{tag}", get(endpoints::users::user_by_tag))
-        .route("/users/{tag}/following", get(endpoints::users::user_follows))
-        .route("/users/{tag}/followers", get(endpoints::users::user_followed_by))
-        .route("/follow", post(endpoints::users::follow_user))
-        .route("/unfollow", delete(endpoints::users::unfollow_user))
-        .route("/posts", post(endpoints::posts::create_post))
-        .route("/posts/{tag}", get(endpoints::posts::get_posts_by_tag))
-        .route("/post/{id}", get(endpoints::posts::get_post_by_id))
-        .route("/post/{id}/like", post(endpoints::likes::like_post))
-        .route("/post/{id}/unlike", delete(endpoints::likes::remove_like_from_post))
-        .route("/post/{id}/replies", get(endpoints::comments::get_post_replies))
-        .route("/comment/{id}", get(endpoints::comments::get_comment))
-        .route("/comment/reply/{id}", post(endpoints::comments::reply_to_comment))
-        .route("/comment/post/{id}", post(endpoints::comments::comment_on_post))
-        .route("/comment/{id}/like", post(endpoints::likes::like_comment))
-        .route("/comment/{id}/unlike", delete(endpoints::likes::remove_like_from_comment))
-        .route("/comment/{id}/replies", get(endpoints::comments::get_comment_replies))
+        .route("/v1/api/status", get(api_status))
+        .route("/v1/auth/signup", post(auth::signup))
+        .route("/v1/auth/login", post(auth::login))
+        .route("/v1/users/{tag}", get(endpoints::users::user_by_tag))
+        .route("/v1/users/{tag}/following", get(endpoints::users::user_follows))
+        .route("/v1/users/{tag}/followers", get(endpoints::users::user_followed_by))
+        .route("/v1/users/{tag}/followers", post(endpoints::users::follow_user))
+        .route("/v1/users/{tag}/followers/me", delete(endpoints::users::unfollow_user))
+        .route("/v1/users/{tag}/posts", get(endpoints::posts::get_posts_by_tag))
+        .route("/v1/posts", post(endpoints::posts::create_post))
+        .route("/v1/posts/{id}", get(endpoints::posts::get_post_by_id))
+        .route("/v1/posts/{id}/comments", get(endpoints::comments::get_post_replies))
+        .route("/v1/posts/{id}/comments", post(endpoints::comments::comment_on_post))
+        .route("/v1/posts/{id}/likes", post(endpoints::likes::like_post))
+        .route("/v1/posts/{id}/likes/me", delete(endpoints::likes::remove_like_from_post))
+        .route("/v1/comments/{id}", get(endpoints::comments::get_comment))
+        .route("/v1/comments/{id}/replies", get(endpoints::comments::get_comment_replies))
+        .route("/v1/comments/{id}/replies", post(endpoints::comments::reply_to_comment))
+        .route("/v1/comments/{id}/likes", post(endpoints::likes::like_comment))
+        .route("/v1/comments/{id}/likes/me", delete(endpoints::likes::remove_like_from_comment))
         .layer(middleware)
         .with_state(db_pool);
     let listener: TcpListener = TcpListener::bind(format!("{host}:{port}")).await.unwrap();
