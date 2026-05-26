@@ -2,7 +2,7 @@ use std::sync::LazyLock;
 
 use axum::{Json, Router, routing::{delete, get, post}};
 use tower::ServiceBuilder;
-use tower_http::trace::{DefaultMakeSpan, DefaultOnResponse, TraceLayer};
+use tower_http::{cors::{Any, CorsLayer}, trace::{DefaultMakeSpan, DefaultOnResponse, TraceLayer}};
 use prometheus::{Counter, Encoder, TextEncoder, register_counter};
 use serde::Serialize;
 use tokio::net::TcpListener;
@@ -41,13 +41,18 @@ async fn main() {
         .unwrap_or("0.0.0.0".into())
         .parse()
         .unwrap();
+    let cors: CorsLayer = CorsLayer::new()
+        .allow_methods(Any)
+        .allow_headers(Any)
+        .allow_origin(Any);
     
     let middleware = ServiceBuilder::new()
         .layer(
             TraceLayer::new_for_http()
                 .make_span_with(DefaultMakeSpan::new().level(Level::INFO))
                 .on_response(DefaultOnResponse::new().level(Level::INFO))
-        );
+        )
+        .layer(cors);
 
     fmt()
     .with_env_filter(EnvFilter::try_from_default_env()
