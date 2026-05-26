@@ -16,23 +16,43 @@ export default function Signup() {
     e.preventDefault();
     setError("");
 
-    // Validaciones 
     if (!name.trim() || !tag.trim() || !email.trim() || !password.trim()) {
       setError("Por favor, completa todos los campos.");
       return;
     }
 
-    const formattedTag = tag.startsWith("@") ? tag.trim() : `@${tag.trim()}`;
+ 
+    const formattedTag = tag.startsWith("@") ? tag.slice(1).trim() : tag.trim();
 
     setIsLoading(true);
 
     try {
-      // Simulación de petición de registro API (Sustituir por fetch)
-      await new Promise((resolve) => setTimeout(resolve, 1500));
-      console.log("Registro exitoso:", { name, tag: formattedTag, email, password });
+      const response = await fetch("http://localhost:8080/v1/auth/signup", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          name: name.trim(),
+          tag: formattedTag, 
+          email: email.trim(),
+          password: password, 
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || "Error al registrar el usuario");
+      }
+
+      const data = await response.json();
+      console.log("¡Usuario guardado en AWS con éxito!", data);
       
-    } catch (err) {
-      setError("Hubo un problema al crear la cuenta. Inténtalo de nuevo.");
+      window.location.href = "/login";
+
+    } catch (err: any) {
+      console.error("Error en el registro:", err);
+      setError(err.message || "Hubo un problema al crear la cuenta. Inténtalo de nuevo.");
     } finally {
       setIsLoading(false);
     }

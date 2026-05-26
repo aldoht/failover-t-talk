@@ -24,7 +24,6 @@ export default function App() {
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [followedTags, setFollowedTags] = useState<string[]>([]);
 
-
   const handlePageChange = (newPage: string) => {
     if (newPage !== "search") {
       setSearchQuery(""); 
@@ -36,7 +35,7 @@ export default function App() {
     setPosts([post, ...posts]);
   }
 
-  function handleToggleLike(postId: number) {
+  function handleToggleLike(postId: string | number) {
     setPosts((prev) =>
       prev.map((post) => {
         if (post.id === postId) {
@@ -61,19 +60,19 @@ export default function App() {
     }
   }
 
-  function handleToggleFollow(identifier: number | string) {
+  function handleToggleFollow(identifier: string | number) {
     let targetTag = "";
 
-    if (typeof identifier === "number") {
-      if (identifier === 10) targetTag = "@sophia";
-      else if (identifier === 11) targetTag = "@danlee";
-      else if (identifier === 12) targetTag = "@daniel";
+    if (typeof identifier === "number" || (typeof identifier === "string" && !identifier.startsWith("@"))) {
+      if (identifier === 10 || identifier === "10") targetTag = "@sophia";
+      else if (identifier === 11 || identifier === "11") targetTag = "@danlee";
+      else if (identifier === 12 || identifier === "12") targetTag = "@daniel";
       else {
         const foundPost = posts.find((p) => p.id === identifier);
         if (foundPost) targetTag = foundPost.tag;
       }
     } else {
-      targetTag = identifier;
+      targetTag = identifier as string;
     }
 
     if (!targetTag) return;
@@ -88,9 +87,9 @@ export default function App() {
     setPage("search");       
   }
 
-  const handleAddComment = (postId: number, text: string) => {
+  const handleAddComment = (postId: string | number, text: string) => {
     const newComment = {
-      id: Date.now(),
+      id: Date.now().toString(),
       name: "Ana Ruiz",
       tag: "@anarz",
       avatar: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?q=80&w=400",
@@ -122,7 +121,7 @@ export default function App() {
     }
   };
 
-  const handleDeleteComment = (postId: number, commentId: number) => {
+  const handleDeleteComment = (postId: string | number, commentId: string | number) => {
     setPosts((prevPosts) =>
       prevPosts.map((post) => {
         if (post.id === postId) {
@@ -145,14 +144,12 @@ export default function App() {
     }
   };
 
-  // borrar publicación
-  function handleDeletePost(postId: number) {
+  function handleDeletePost(postId: string | number) {
     setPosts((prev) => prev.filter((post) => post.id !== postId));
     setSelectedPost(null);
   }
 
-  // editar publicación
-  function handleEditPost(postId: number, newText: string) {
+  function handleEditPost(postId: string | number, newText: string) {
     setPosts((prev) =>
       prev.map((post) => {
         if (post.id === postId) {
@@ -177,7 +174,6 @@ export default function App() {
     return <Login />;
   }
 
-  // generar publicaciones fantasmas
   const basePostsWithState = posts.map((post) => ({
     ...post,
     following: followedTags.includes(post.tag),
@@ -196,7 +192,7 @@ export default function App() {
       name: user.name,
       tag: user.tag,
       avatar: user.avatar,
-      text: `¡Hola! Soy ${user.name} (${user.tag}). Gracias por seguirme en T-Talk Monterrey. Muy pronto subiré contenido interactivo aquí. ✨`,
+      text: `¡Hola! Soy ${user.name} (${user.tag}). Gracias por seguirme`,
       likes: 0,
       comments: 0,
       liked: false,
@@ -208,11 +204,9 @@ export default function App() {
     } as Post)); 
   const finalPostsForApp = [...ghostPosts, ...basePostsWithState];
 
-
   const legacyFollowedUserIds = rightPanelUsers
     .filter((u) => followedTags.includes(u.tag))
     .map((u) => u.id);
-
 
   function renderPage() {
     switch (page) {
@@ -291,12 +285,10 @@ export default function App() {
     <div className="min-h-screen text-gray-800 bg-gradient-to-br from-gray-50 via-gray-100 to-zinc-200/70 attachment-fixed font-sans antialiased">
       <div className="max-w-[1400px] mx-auto grid lg:grid-cols-[260px_1fr_360px] gap-6 px-4 lg:px-6">
         
-        {/* sidebar */}
         <div className="hidden lg:block sticky top-0 h-screen py-6">
           <Sidebar page={page} setPage={handlePageChange} />
         </div>
 
-        {/* main */}
         <main className="py-6 pb-32 lg:pb-6">
           <div className="bg-white/30 backdrop-blur-3xl border border-white/40 rounded-[32px] overflow-hidden shadow-xl min-h-[85vh]">
             
@@ -310,7 +302,6 @@ export default function App() {
           </div>
         </main>
 
-        {/* panel derecho */}
         <div className="hidden lg:block sticky top-0 h-screen py-6 overflow-y-auto no-scrollbar">
           <RightPanel 
             onSearchTrend={handleSearchTrend}

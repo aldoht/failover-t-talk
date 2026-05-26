@@ -20,7 +20,6 @@ export default function Login() {
     setIsLoading(true);
 
     try {
-      // Simulación de petición de autenticación API (sustituye por fetch)
       await new Promise((resolve) => setTimeout(resolve, 1500));
       console.log("Login exitoso con:", { email, password });
       
