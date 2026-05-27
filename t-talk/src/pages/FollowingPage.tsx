@@ -5,21 +5,26 @@ import { Users } from "lucide-react";
 interface Props {
   posts: Post[];
   onOpenPost?: (post: Post) => void;
-  onLikePost?: (id: number) => void;
-  onFollowPost?: (id: number) => void;
-  onDeletePost?: (id: number) => void;
-  onEditPost?: (id: number, text: string) => void;
+  onLikePost?: (id: string) => void;
+  onFollowPost?: (tag: string) => void;
+  onDeletePost?: (id: string) => void;
+  onEditPost?: (id: string, text: string) => void;
 }
 
 export default function FollowingPage({
   posts,
   onOpenPost,
   onLikePost,
-  onFollowPost, 
+  onFollowPost,
   onDeletePost,
   onEditPost,
 }: Props) {
-  const followingPosts = posts.filter((post) => post.following);
+  const myTag = (localStorage.getItem("user_tag") || "").replace("@", "");
+
+  // Solo posts de usuarios que seguimos (excluye los propios)
+  const followingPosts = posts.filter(
+    (p) => p.following && p.tag.replace("@", "") !== myTag
+  );
 
   return (
     <div className="space-y-4 animate-fade-in">
@@ -29,10 +34,10 @@ export default function FollowingPage({
             key={post.id}
             post={post}
             onOpen={() => onOpenPost?.(post)}
-            onLike={() => onLikePost?.(post.id)}
-            onFollow={() => onFollowPost?.(post.id)} 
-            onDelete={() => onDeletePost?.(post.id)}
-            onEdit={(newText) => onEditPost?.(post.id, newText)}
+            onLike={(id: string) => onLikePost?.(id)}
+            onFollow={(tag: string) => onFollowPost?.(tag)}
+            onDelete={(id: string) => onDeletePost?.(id)}
+            onEdit={(id: string, newText: string) => onEditPost?.(id, newText)}
           />
         ))
       ) : (

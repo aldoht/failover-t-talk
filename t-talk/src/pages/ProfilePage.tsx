@@ -1,82 +1,200 @@
-import { useState } from "react";
-import type { Post } from "../services/api";
+import { useState, useEffect } from "react";
 import PostCard from "../components/PostCard";
-import { Pencil, MapPin, Sparkles, X, Check } from "lucide-react";
+import { Pencil, MapPin, Sparkles, X, Check, Loader2, Trash2, Image } from "lucide-react";
+import type { Post } from "../services/api";
 
 interface Props {
-  posts: Post[];
-  onOpenPost?: (post: Post) => void;
-  onLikePost?: (id: number) => void;
-  onFollowPost?: (id: number) => void;
-  onDeletePost?: (id: number) => void;
-  onEditPost?: (id: number, text: string) => void;
+  posts?: Post[];
+  onOpenPost?: (post: any) => void;
+  onLikePost?: (id: string) => void;
+  onFollowPost?: (tag: string) => void;
+  onDeletePost?: (id: string) => void;
+  onEditPost?: (id: string, text: string) => void;
 }
 
 export default function ProfilePage({
-  posts,
+  posts = [],
   onOpenPost,
   onLikePost,
   onFollowPost,
   onDeletePost,
   onEditPost,
 }: Props) {
-
   const [activeTab, setActiveTab] = useState<"posts" | "liked">("posts");
   const [isEditingProfile, setIsEditingProfile] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   const [profileData, setProfileData] = useState({
-    name: "Ana Ruiz",
-    bio: "Hola chicos, esto es una prueba",
+    name: "",
+    tag: "",
+    bio: "",
+    profile_picture_url: "",
     location: "Monterrey, MX",
   });
 
-  const [tempName, setTempName] = useState(profileData.name);
-  const [tempBio, setTempBio] = useState(profileData.bio);
-  const [tempLocation, setTempLocation] = useState(profileData.location);
+  const [followersCount, setFollowersCount] = useState(0);
+  const [followingCount, setFollowingCount] = useState(0);
+  const [likedPosts, setLikedPosts] = useState<Post[]>([]);
 
-  const ownPosts = (posts || []).filter((post) => post.isOwnPost);
- 
-  const likedPosts = (posts || []).filter((post) => post.liked);
+  const [tempName, setTempName] = useState("");
+  const [tempBio, setTempBio] = useState("");
+  const [tempLocation, setTempLocation] = useState("");
+  const [tempPhotoUrl, setTempPhotoUrl] = useState("");
 
-  // seguidores
-  const followingCount = (posts || []).filter((post) => post.following && !post.isOwnPost).length;
-  const followersCount = ownPosts.length * 3 + 142; 
-  // posts que te gustaron
-  const postsToRender = activeTab === "posts" ? ownPosts : likedPosts;
+  useEffect(() => {
+    const loadProfile = async () => {
+      const token = localStorage.getItem("token");
+      let myTag = (localStorage.getItem("user_tag") || "").replace("@", "");
+      if (!myTag) myTag = "usuario";
 
-  function handleSaveProfile() {
-    if (!tempName.trim()) return;
-    setProfileData({
-      name: tempName,
-      bio: tempBio,
-      location: tempLocation,
+      try {
+        const [userRes, followersRes, followingRes] = await Promise.all([
+          fetch(`http://localhost:8080/v1/users/${myTag}`, {
+            headers: { Authorization: `Bearer ${token}` },
+          }),
+          fetch(`http://localhost:8080/v1/users/${myTag}/followers`, {
+            headers: { Authorization: `Bearer ${token}` },
+          }),
+          fetch(`http://localhost:8080/v1/users/${myTag}/following`, {
+            headers: { Authorization: `Bearer ${token}` },
+          }),
+        ]);
+
+        if (userRes.ok) {
+          const userData = await userRes.json();
+          setProfileData({
+            name: userData.name || localStorage.getItem("user_name") || "Usuario",
+            tag: userData.tag || myTag,
+            bio: userData.bio || "¡Hola! Estoy usando T-Talk.",
+            profile_picture_url:
+              userData.profile_picture_url ||
+              "https://images.unsplash.com/photo-1494790108377-be9c29b29330?q=80&w=400",
+            location: "Monterrey, MX",
+          });
+        } else {
+          setProfileData({
+            name: localStorage.getItem("user_name") || "Usuario",
+            tag: myTag,
+            bio: "¡Hola! Estoy usando T-Talk.",
+            profile_picture_url:
+              "https://images.unsplash.com/photo-1494790108377-be9c29b29330?q=80&w=400",
+            location: "Monterrey, MX",
+          });
+        }
+
+        if (followersRes.ok) {
+          const d = await followersRes.json();
+          setFollowersCount(Array.isArray(d) ? d.length : d?.count || 0);
+        }
+        if (followingRes.ok) {
+          const d = await followingRes.json();
+          setFollowingCount(Array.isArray(d) ? d.length : d?.count || 0);
+        }
+      } catch (err) {
+        console.error("Error conectando con la API:", err);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadProfile();
+  }, []);
+
+  const myTag = (localStorage.getItem("user_tag") || "").replace("@", "");
+  const myPosts = posts.filter((p) => p.tag.replace("@", "") === myTag);
+
+  useEffect(() => {
+    if (activeTab !== "liked") return;
+    setLikedPosts(posts.filter((p) => p.liked));
+  }, [activeTab, posts]);
+
+  async function handleDeleteAccount() {
+    const token = localStorage.getItem("token");
+    if (!token) return;
+
+    const res = await fetch("http://localhost:8080/v1/users/me", {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${token}` },
     });
-    setIsEditingProfile(false);
+
+    if (res.ok) {
+      localStorage.clear();
+      window.location.reload();
+    }
+  }
+
+  async function handleSaveProfile() {
+    if (!tempName.trim()) return;
+    const token = localStorage.getItem("token");
+    setIsSaving(true);
+
+    try {
+      const res = await fetch(`http://localhost:8080/v1/users/${profileData.tag}`, {
+        method: "PUT",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          name: tempName,
+          bio: tempBio,
+          // profile_picture_url: tempPhotoUrl, // ← descomentar cuando el backend lo soporte
+        }),
+      });
+
+      if (res.ok) {
+        setProfileData((prev) => ({
+          ...prev,
+          name: tempName,
+          bio: tempBio,
+          location: tempLocation,
+          // profile_picture_url: tempPhotoUrl || prev.profile_picture_url,
+        }));
+        localStorage.setItem("user_name", tempName);
+        window.dispatchEvent(new Event("profile-updated"));
+      }
+    } catch (err) {
+      console.error("Error guardando perfil:", err);
+    } finally {
+      setIsSaving(false);
+      setIsEditingProfile(false);
+    }
   }
 
   function handleOpenModal() {
     setTempName(profileData.name);
     setTempBio(profileData.bio);
     setTempLocation(profileData.location);
+    setTempPhotoUrl(profileData.profile_picture_url);
     setIsEditingProfile(true);
+  }
+
+  const postsToRender = activeTab === "posts" ? myPosts : likedPosts;
+
+  if (isLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center py-24 text-gray-500 gap-2 font-medium text-sm">
+        <Loader2 className="animate-spin text-[#8b7355]" size={24} />
+        <span>Cargando perfil...</span>
+      </div>
+    );
   }
 
   return (
     <div className="space-y-6 animate-fade-in max-w-2xl mx-auto pb-12 w-full">
-      
-      {/* div del perfil */}
       <div className="bg-white/80 backdrop-blur-2xl border border-white/40 rounded-[32px] overflow-hidden shadow-sm">
-        {/* foto de portada */}
         <div className="h-40 bg-gradient-to-tr from-[#e6ccb2] via-[#ede0d4] to-[#ddc3a5] relative overflow-hidden">
           <div className="absolute inset-0 bg-white/10 backdrop-blur-[1px]" />
         </div>
 
-        {/* contenido del perfil */}
         <div className="px-6 pb-6 relative">
+          {/* Foto + nombre */}
           <div className="flex justify-between items-start gap-4">
             <div className="relative">
               <img
-                src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?q=80&w=400"
+                src={profileData.profile_picture_url}
                 alt={profileData.name}
                 className="w-24 h-24 rounded-full border-4 border-white shadow-sm -mt-12 object-cover transition-transform duration-300 hover:scale-105"
               />
@@ -85,7 +203,7 @@ export default function ProfilePage({
               </h2>
               <div className="flex items-center gap-3 mt-1.5 flex-wrap">
                 <span className="text-[11px] font-bold text-gray-400 bg-gray-50 border border-gray-100 px-2.5 py-0.5 rounded-full">
-                  @anarz
+                  @{profileData.tag}
                 </span>
                 <span className="text-[11px] font-medium text-gray-400 flex items-center gap-1">
                   <MapPin size={12} /> {profileData.location}
@@ -93,13 +211,16 @@ export default function ProfilePage({
               </div>
             </div>
 
-            <button
-              onClick={handleOpenModal}
-              className="mt-4 bg-gray-950 hover:bg-gray-800 text-white font-bold text-xs shadow-sm hover:shadow transition-all duration-200 px-4 py-2 rounded-full flex items-center gap-1.5 active:scale-95"
-            >
-              <Pencil size={12} />
-              Editar perfil
-            </button>
+            {/* Botones — apilados verticalmente para que no choquen */}
+            <div className="mt-4">
+              <button
+                onClick={handleOpenModal}
+                className="bg-gray-950 hover:bg-gray-800 text-white font-bold text-xs shadow-sm hover:shadow transition-all duration-200 px-4 py-2 rounded-full flex items-center gap-1.5 active:scale-95"
+              >
+                <Pencil size={12} />
+                Editar perfil
+              </button>
+            </div>
           </div>
 
           <p className="mt-4 text-sm leading-relaxed text-gray-600 font-medium max-w-xl">
@@ -108,7 +229,7 @@ export default function ProfilePage({
 
           <div className="flex gap-6 mt-5 pt-4 border-t border-gray-100">
             <div className="flex items-baseline gap-1.5">
-              <span className="font-black text-lg text-gray-900">{ownPosts.length}</span>
+              <span className="font-black text-lg text-gray-900">{myPosts.length}</span>
               <span className="text-[10px] text-gray-400 font-bold tracking-wider uppercase">Publicaciones</span>
             </div>
             <div className="flex items-baseline gap-1.5">
@@ -123,29 +244,23 @@ export default function ProfilePage({
         </div>
       </div>
 
+      {/* Tabs */}
       <div className="border-b border-gray-100 flex gap-6 px-4 text-xs font-bold shrink-0">
         <button
           onClick={() => setActiveTab("posts")}
-          className={`pb-3 px-1 transition-all ${
-            activeTab === "posts"
-              ? "text-gray-950 border-b-2 border-gray-950"
-              : "text-gray-400 hover:text-gray-600"
-          }`}
+          className={`pb-3 px-1 transition-all ${activeTab === "posts" ? "text-gray-950 border-b-2 border-gray-950" : "text-gray-400 hover:text-gray-600"}`}
         >
           Mis Publicaciones
         </button>
         <button
           onClick={() => setActiveTab("liked")}
-          className={`pb-3 px-1 transition-all ${
-            activeTab === "liked"
-              ? "text-gray-950 border-b-2 border-gray-950"
-              : "text-gray-400 hover:text-gray-600"
-          }`}
+          className={`pb-3 px-1 transition-all ${activeTab === "liked" ? "text-gray-950 border-b-2 border-gray-950" : "text-gray-400 hover:text-gray-600"}`}
         >
           Me gusta
         </button>
       </div>
 
+      {/* Posts */}
       <div className="space-y-4">
         {postsToRender.length > 0 ? (
           postsToRender.map((post) => (
@@ -154,35 +269,112 @@ export default function ProfilePage({
               post={post}
               onOpen={() => onOpenPost?.(post)}
               onLike={() => onLikePost?.(post.id)}
-              onFollow={() => onFollowPost?.(post.id)}
+              onFollow={() => onFollowPost?.(post.tag)}
               onDelete={() => onDeletePost?.(post.id)}
-              onEdit={(newText) => onEditPost?.(post.id, newText)}
+              onEdit={(id, newText) => onEditPost?.(id, newText)}
             />
           ))
         ) : (
           <div className="text-center py-12 bg-white/30 border border-dashed border-gray-200 rounded-[24px] text-gray-400 text-xs font-medium">
-            {activeTab === "posts" 
-              ? "Aún no has creado ninguna publicación pública." 
-              : "Aún no le has dado 'Me gusta' a ninguna publicación."}
+            {activeTab === "posts"
+              ? "Aún no has creado ninguna publicación pública."
+              : "Aún no le has dado 'Me gusta' a ninguna publicación. Explora el feed para verlos."}
           </div>
         )}
       </div>
 
-      
+      {/* Modal confirmar eliminar cuenta */}
+      {showDeleteConfirm && (
+        <div
+          className="fixed inset-0 bg-black/50 backdrop-blur-md flex items-center justify-center z-50 p-4 animate-fade-in"
+          onClick={() => setShowDeleteConfirm(false)}
+        >
+          <div
+            className="bg-white/95 backdrop-blur-2xl border border-white rounded-[28px] p-6 shadow-xl w-full max-w-sm space-y-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex flex-col items-center text-center gap-2">
+              <div className="w-12 h-12 rounded-full bg-red-50 border border-red-100 flex items-center justify-center">
+                <Trash2 size={20} className="text-red-500" />
+              </div>
+              <h3 className="font-black text-gray-900 text-base">¿Eliminar tu cuenta?</h3>
+              <p className="text-xs text-gray-500 leading-relaxed max-w-xs">
+                Esta acción es permanente e irreversible. Todos tus posts, comentarios y datos serán eliminados.
+              </p>
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setShowDeleteConfirm(false)}
+                className="flex-1 py-2.5 rounded-full text-xs font-bold bg-gray-100 hover:bg-gray-200 text-gray-700 transition active:scale-95"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleDeleteAccount}
+                className="flex-1 py-2.5 rounded-full text-xs font-bold bg-red-500 hover:bg-red-600 text-white transition active:scale-95"
+              >
+                Sí, eliminar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal editar perfil */}
       {isEditingProfile && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-md flex items-center justify-center z-50 p-4 animate-fade-in" onClick={() => setIsEditingProfile(false)}>
-          <div className="bg-white/95 backdrop-blur-2xl border border-white rounded-[28px] p-6 shadow-xl w-full max-w-md space-y-4 transition-all" onClick={(e) => e.stopPropagation()}>
+        <div
+          className="fixed inset-0 bg-black/40 backdrop-blur-md flex items-center justify-center z-50 p-4 animate-fade-in"
+          onClick={() => setIsEditingProfile(false)}
+        >
+          <div
+            className="bg-white/95 backdrop-blur-2xl border border-white rounded-[28px] p-6 shadow-xl w-full max-w-md space-y-4"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="flex items-center justify-between border-b border-gray-100 pb-3">
               <h3 className="font-bold text-sm text-gray-900 flex items-center gap-1.5 uppercase tracking-wider">
                 <Sparkles size={14} className="text-[#d6bfa7]" fill="currentColor" /> Editar tu Perfil
               </h3>
-              <button onClick={() => setIsEditingProfile(false)} className="text-gray-400 hover:text-gray-600 p-1 bg-gray-50 rounded-full">
+              <button
+                onClick={() => setIsEditingProfile(false)}
+                className="text-gray-400 hover:text-gray-600 p-1 bg-gray-50 rounded-full"
+              >
                 <X size={14} />
               </button>
             </div>
+
             <div className="space-y-3.5">
+              {/* Preview foto */}
+              <div className="flex items-center gap-4">
+                <img
+                  src={tempPhotoUrl || profileData.profile_picture_url}
+                  alt="Preview"
+                  className="w-14 h-14 rounded-full object-cover border-2 border-white shadow"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).src =
+                      "https://images.unsplash.com/photo-1494790108377-be9c29b29330?q=80&w=400";
+                  }}
+                />
+                <div className="flex-1 min-w-0">
+                  <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wide block mb-1 flex items-center gap-1">
+                    <Image size={10} /> Foto de perfil (URL)
+                  </label>
+                  <input
+                    type="text"
+                    value={tempPhotoUrl}
+                    onChange={(e) => setTempPhotoUrl(e.target.value)}
+                    placeholder="https://..."
+                    disabled // ← quitar cuando el backend soporte PUT con foto
+                    className="w-full bg-gray-100 border border-gray-200/60 rounded-xl px-3 py-2 text-xs text-gray-400 font-medium outline-none cursor-not-allowed"
+                    title="Disponible próximamente — pendiente de backend"
+                  />
+                  <p className="text-[10px] text-gray-400 mt-1">Próximamente disponible</p>
+                </div>
+              </div>
+
               <div>
-                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wide block mb-1">Nombre Público</label>
+                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wide block mb-1">
+                  Nombre Público
+                </label>
                 <input
                   type="text"
                   value={tempName}
@@ -192,7 +384,9 @@ export default function ProfilePage({
               </div>
 
               <div>
-                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wide block mb-1">Ubicación</label>
+                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wide block mb-1">
+                  Ubicación
+                </label>
                 <input
                   type="text"
                   value={tempLocation}
@@ -202,7 +396,9 @@ export default function ProfilePage({
               </div>
 
               <div>
-                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wide block mb-1">Biografía</label>
+                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wide block mb-1">
+                  Biografía
+                </label>
                 <textarea
                   value={tempBio}
                   onChange={(e) => setTempBio(e.target.value)}
@@ -212,20 +408,30 @@ export default function ProfilePage({
               </div>
             </div>
 
-            <div className="flex justify-end pt-2">
+            <div className="flex items-center justify-between pt-2 border-t border-gray-100">
+              <button
+                onClick={() => {
+                  setIsEditingProfile(false);
+                  setShowDeleteConfirm(true);
+                }}
+                className="flex items-center gap-1.5 text-xs font-bold text-red-400 hover:text-red-600 hover:bg-red-50 px-3 py-2 rounded-full transition active:scale-95"
+              >
+                <Trash2 size={12} />
+                Eliminar cuenta
+              </button>
+
               <button
                 onClick={handleSaveProfile}
-                disabled={!tempName.trim()}
+                disabled={!tempName.trim() || isSaving}
                 className="bg-gray-950 hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold text-xs px-5 py-2 rounded-full flex items-center gap-1.5 shadow-sm transition active:scale-95"
               >
-                <Check size={12} strokeWidth={2.5} />
-                Guardar Cambios
+                {isSaving ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} strokeWidth={2.5} />}
+                {isSaving ? "Guardando..." : "Guardar Cambios"}
               </button>
             </div>
           </div>
         </div>
       )}
-
     </div>
   );
 }

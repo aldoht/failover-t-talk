@@ -1,7 +1,6 @@
 import {
   Home,
   Search,
-  Bell,
   Users,
   User
 } from "lucide-react";
@@ -30,11 +29,6 @@ export default function BottomBar({
     {
       id: "search",
       icon: Search,
-    },
-
-    {
-      id: "notifications",
-      icon: Bell,
     },
 
     {

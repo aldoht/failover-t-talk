@@ -1,6 +1,5 @@
 export type CommentType = {
-
-  id: number;
+  id: string;
   name: string;
   tag: string;
   avatar: string;
@@ -11,8 +10,7 @@ export type CommentType = {
 };
 
 export type Post = {
-
-  id: number;
+  id: string;
   name: string;
   tag: string;
   avatar: string;
@@ -29,191 +27,170 @@ export type Post = {
   saved?: boolean;
   reposts?: number;
   views?: string;
-  commentsData?: CommentType[];
+  commentsData: CommentType[];
 };
 
-export const currentUser = {
+const API_URL = "http://localhost:8080/v1";
 
-  name: "Ana Ruiz",
-  tag: "@anarz",
-  avatar:
-    "https://images.unsplash.com/photo-1494790108377-be9c29b29330?q=80&w=400",
-  location: "Monterrey, MX",
-};
-
-const USE_MOCK = true;
-
-const API_URL =
-  "http://localhost:8080";
-
-export async function getPosts() {
-
-  if (USE_MOCK) {
-    return [];
-
-  }
-
-  const response =
-    await fetch(`${API_URL}/`);
-
-  return response.json();
+function getAuthHeaders(): Record<string, string> {
+  const token = localStorage.getItem("token");
+  return {
+    "Content-Type": "application/json",
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  };
 }
 
-
-export async function createPost(
-  data: Partial<Post>
-) {
-
-  if (USE_MOCK) {
-
-    return data;
-  }
-
-  const response =
-    await fetch(
-      `${API_URL}/posts`,
-      {
-        method: "POST",
-
-        headers: {
-          "Content-Type":
-            "application/json",
-        },
-
-        body: JSON.stringify(
-          data
-        ),
-      }
-    );
-
-  return response.json();
+// Auth
+export async function login(body: { email: string; password: string }) {
+  const res = await fetch(`${API_URL}/auth/login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error("Credenciales inválidas");
+  const data = await res.json();
+  localStorage.setItem("token", data.token);
+  return data;
 }
 
-
-export async function likePost(
-  id: number
-) {
-
-  if (USE_MOCK) {
-
-    return true;
-  }
-
-  const response =
-    await fetch(
-      `${API_URL}/posts/${id}/like`,
-      {
-        method: "POST",
-      }
-    );
-
-  return response.json();
+// Posts
+export async function createPost(data: { text: string; url?: string }) {
+  const res = await fetch(`${API_URL}/posts`, {
+    method: "POST",
+    headers: getAuthHeaders(),
+    body: JSON.stringify({ text: data.text, url: data.url ?? null }),
+  });
+  return res.ok;
 }
 
-
-export async function commentPost(
-  id: number,
-  text: string
-) {
-
-  if (USE_MOCK) {
-
-    return {
-      success: true,
-      text,
-    };
-  }
-
-  const response =
-    await fetch(
-      `${API_URL}/posts/${id}/comment`,
-      {
-        method: "POST",
-
-        headers: {
-          "Content-Type":
-            "application/json",
-        },
-
-        body: JSON.stringify({
-          text,
-        }),
-      }
-    );
-
-  return response.json();
+export async function deletePost(id: string) {
+  const res = await fetch(`${API_URL}/posts/${id}/me`, {  // ✅ ruta correcta
+    method: "DELETE",
+    headers: getAuthHeaders(),
+  });
+  return res.ok;
 }
 
-export async function followUser(
-  username: string
-) {
-
-  if (USE_MOCK) {
-
-    return true;
-  }
-
-  const response =
-    await fetch(
-      `${API_URL}/follow/${username}`,
-      {
-        method: "POST",
-      }
-    );
-
-  return response.json();
+export async function editPost(id: string, text: string) {
+  const res = await fetch(`${API_URL}/posts/${id}`, {     // pendiente backend
+    method: "PUT",
+    headers: getAuthHeaders(),
+    body: JSON.stringify({ text }),
+  });
+  return res.ok;
 }
 
-
-export async function deletePost(
-  id: number
-) {
-
-  if (USE_MOCK) {
-
-    return true;
-  }
-
-  const response =
-    await fetch(
-      `${API_URL}/posts/${id}`,
-      {
-        method: "DELETE",
-      }
-    );
-
-  return response.json();
+export async function likePost(id: string) {
+  const res = await fetch(`${API_URL}/posts/${id}/likes`, {
+    method: "POST",
+    headers: getAuthHeaders(),
+  });
+  return res.ok;
 }
 
-export async function editPost(
-  id: number,
-  text: string
-) {
+export async function unlikePost(id: string) {
+  const res = await fetch(`${API_URL}/posts/${id}/likes/me`, {
+    method: "DELETE",
+    headers: getAuthHeaders(),
+  });
+  return res.ok;
+}
 
-  if (USE_MOCK) {
+// Comentarios
+export async function getComments(postId: string) {
+  const res = await fetch(`${API_URL}/posts/${postId}/comments`, {
+    headers: getAuthHeaders(),
+  });
+  if (!res.ok) return [];
+  return res.json();
+}
 
-    return {
-      success: true,
-      text,
-    };
-  }
+export async function addComment(postId: string, text: string) {
+  const res = await fetch(`${API_URL}/posts/${postId}/comments`, {
+    method: "POST",
+    headers: getAuthHeaders(),
+    body: JSON.stringify({ text }),
+  });
+  return res.ok;
+}
 
-  const response =
-    await fetch(
-      `${API_URL}/posts/${id}`,
-      {
-        method: "PUT",
+export async function deleteComment(commentId: string) {
+  const res = await fetch(`${API_URL}/comments/${commentId}/me`, {
+    method: "DELETE",
+    headers: getAuthHeaders(),
+  });
+  return res.ok;
+}
 
-        headers: {
-          "Content-Type":
-            "application/json",
-        },
+export async function likeComment(id: string) {
+  const res = await fetch(`${API_URL}/comments/${id}/likes`, {
+    method: "POST",
+    headers: getAuthHeaders(),
+  });
+  return res.ok;
+}
 
-        body: JSON.stringify({
-          text,
-        }),
-      }
-    );
+export async function unlikeComment(id: string) {
+  const res = await fetch(`${API_URL}/comments/${id}/likes/me`, {
+    method: "DELETE",
+    headers: getAuthHeaders(),
+  });
+  return res.ok;
+}
 
-  return response.json();
+// Usuarios
+export async function getUser(tag: string) {
+  const res = await fetch(`${API_URL}/users/${tag}`, {
+    headers: getAuthHeaders(),
+  });
+  if (!res.ok) return null;
+  return res.json();
+}
+
+export async function getUserPosts(tag: string) {
+  const res = await fetch(`${API_URL}/users/${tag}/posts`, {
+    headers: getAuthHeaders(),
+  });
+  if (!res.ok) return [];
+  return res.json();
+}
+
+export async function getFollowers(tag: string) {
+  const res = await fetch(`${API_URL}/users/${tag}/followers`, {
+    headers: getAuthHeaders(),
+  });
+  if (!res.ok) return [];
+  return res.json();
+}
+
+export async function getFollowing(tag: string) {
+  const res = await fetch(`${API_URL}/users/${tag}/following`, {
+    headers: getAuthHeaders(),
+  });
+  if (!res.ok) return [];
+  return res.json();
+}
+
+export async function followUser(tag: string) {
+  const res = await fetch(`${API_URL}/users/${tag}/followers`, {
+    method: "POST",
+    headers: getAuthHeaders(),
+  });
+  return res.ok;
+}
+
+export async function unfollowUser(tag: string) {
+  const res = await fetch(`${API_URL}/users/${tag}/followers/me`, {
+    method: "DELETE",
+    headers: getAuthHeaders(),
+  });
+  return res.ok;
+}
+
+export async function deleteAccount() {
+  const res = await fetch(`${API_URL}/users/me`, {
+    method: "DELETE",
+    headers: getAuthHeaders(),
+  });
+  return res.ok;
 }
