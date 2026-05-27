@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM posts WHERE user_id = $1 AND post_id = $2",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "bed89d6a0587b8b0cacef58ac854e4e479655fd0a454a6ed7082db5a02642428"
+}

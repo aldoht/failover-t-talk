@@ -68,3 +68,19 @@ pub async fn get_post_by_id(
 
     Ok(post)
 }
+
+pub async fn delete_post(
+    db_pool: &PgPool,
+    post_id: &Uuid,
+    user_id: &Uuid,
+) -> Result<(), sqlx::Error> {
+    sqlx::query!(
+        "DELETE FROM posts WHERE user_id = $1 AND post_id = $2",
+        user_id,
+        post_id,
+    )
+    .execute(db_pool)
+    .await?;
+
+    Ok(())
+}

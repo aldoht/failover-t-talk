@@ -171,3 +171,17 @@ pub async fn delete_follow(
 
     Ok(())
 }
+
+pub async fn delete_user(
+    db_pool: &PgPool,
+    user_id: &Uuid,
+) -> Result<(), sqlx::Error> {
+    sqlx::query!(
+        "DELETE FROM users WHERE user_id = $1",
+        user_id,
+    )
+    .execute(db_pool)
+    .await?;
+
+    Ok(())
+}
