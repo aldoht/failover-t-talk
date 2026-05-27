@@ -1,7 +1,7 @@
 use std::sync::LazyLock;
 use std::time::Instant;
 
-use axum::{Json, Router, routing::{delete, get, post}, extract::{MatchedPath, Request}, middleware::{self, Next}, response::Response};
+use axum::{Json, Router, extract::{MatchedPath, Request}, middleware::{self, Next}, response::Response, routing::{delete, get, patch, post}};
 use tower::ServiceBuilder;
 use tower_http::trace::{DefaultMakeSpan, DefaultOnResponse, TraceLayer};
 use prometheus::{Encoder, TextEncoder, HistogramVec, IntCounterVec, register_histogram_vec, register_int_counter_vec};
@@ -103,6 +103,7 @@ async fn main() {
         .route("/v1/auth/signup", post(auth::signup))
         .route("/v1/auth/login", post(auth::login))
         .route("/v1/users/me", delete(endpoints::users::delete_user))
+        .route("/v1/users/me", patch(endpoints::users::update_user))
         .route("/v1/users/{tag}", get(endpoints::users::user_by_tag))
         .route("/v1/users/{tag}/following", get(endpoints::users::user_follows))
         .route("/v1/users/{tag}/followers", get(endpoints::users::user_followed_by))
