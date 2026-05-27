@@ -1,199 +1,138 @@
 import { useState } from "react";
-import type { Post } from "../services/api";
-
 import {
   Heart,
   MessageCircle,
   UserPlus,
-  Check
+  Check,
+  Pencil,
+  Trash2,
+  Clock3,
+  MapPin
 } from "lucide-react";
+import type { Post } from "../services/api";
 
 interface Props {
   post: Post;
+  onOpen?: () => void;
+  onLike?: (id: string) => void;
+  onFollow?: (tag: string) => void;
+  onDelete?: (id: string) => void;
+  onEdit?: (id: string, text: string) => void;
 }
 
-export default function PostCard({ post }: Props) {
+export default function PostCard({
+  post,
+  onOpen,
+  onLike,
+  onFollow,
+  onDelete,
+  onEdit,
+}: Props) {
+  const [editing, setEditing] = useState(false);
+  const [editedText, setEditedText] = useState(post.text);
 
-  const [liked, setLiked] = useState(false);
+  function handleFollow(e: React.MouseEvent) {
+    e.stopPropagation();
+    onFollow?.(post.tag);
+  }
 
-  const [likes, setLikes] = useState(post.likes);
+  function handleEdit(e: React.MouseEvent) {
+    e.stopPropagation();
+    if (editing) {
+      onEdit?.(post.id, editedText); // Envía ID primero, luego el texto modificado
+    }
+    setEditing(!editing);
+  }
 
-  const [following, setFollowing] = useState(false);
-
-  const [showComments, setShowComments] = useState(false);
-
-  const [comment, setComment] = useState("");
-
-  function handleLike() {
-
-    setLiked(!liked);
-
-    setLikes(
-      liked ? likes - 1 : likes + 1
-    );
+  function handleDelete(e: React.MouseEvent) {
+    e.stopPropagation();
+    onDelete?.(post.id);
   }
 
   return (
-
-    <div
-      className="
-      bg-white/40
-      backdrop-blur-xl
-      border border-white/30
-      rounded-3xl
-      p-5
-      hover:bg-white/60
-      transition
-      "
-    >
-
+    <div className="bg-white/40 backdrop-blur-xl border border-white/30 rounded-[24px] p-5 hover:bg-white/60 transition-all duration-300 shadow-sm hover:shadow-md">
       <div className="flex gap-4">
-
-    <img
-          src={post.avatar}
-          alt="avatar"
-          className="
-          w-14
-          h-14
-          rounded-full
-          object-cover
-          "
+        <img
+          src={post.avatar || "https://images.unsplash.com/photo-1494790108377-be9c29b29330?q=80&w=400"}
+          alt={`Avatar de ${post.name}`}
+          className="w-12 h-12 rounded-full object-cover shadow-inner shrink-0"
         />
 
-        <div className="flex-1">
-
-          <div className="flex items-center gap-2">
-
-            <p className="font-bold">
-              {post.name}
-            </p>
-
-            <p className="text-gray-500">
-              {post.tag}
-            </p>
-
-          </div>
-
-          <p className="mt-3 leading-relaxed text-[15px]">
-            {post.text}
-          </p>
-
-          <div className="flex gap-8 mt-5 text-gray-500 items-center">
-
-            {/* LIKE */}
-            <button
-              onClick={handleLike}
-              className={`flex items-center gap-2 hover:text-pink-400 transition ${
-                liked ? "text-pink-400" : ""
-              }`}
-            >
-              <Heart size={18} />
-              {likes}
-            </button>
-
-            {/* Comentario */}
-            <button
-              onClick={() => setShowComments(!showComments)}
-              className="flex items-center gap-2 hover:text-blue-400 transition"
-            >
-              <MessageCircle size={18} />
-              {post.comments}
-            </button>
-
-            {/* seguir */}
-            <button
-              onClick={() => setFollowing(!following)}
-              className={`
-                flex items-center gap-2
-                transition
-                px-4
-                py-2
-                rounded-full
-                text-sm
-                ${
-                  following
-                    ? "bg-green-100 text-green-700"
-                    : "hover:text-green-500"
-                }
-              `}
-            >
-
-              {following ? (
-                <>
-                  <Check size={16} />
-                  Siguendo
-                </>
-              ) : (
-                <>
-                  <UserPlus size={16} />
-                  Seguir
-                </>
-              )}
-
-            </button>
-
-          </div>
-
-          {/* seccion de comentarios */}
-          {showComments && (
-
-            <div
-              className="
-              mt-5
-              bg-white/50
-              backdrop-blur-xl
-              border border-white/30
-              rounded-3xl
-              p-5
-              "
-            >
-
-              <h3 className="font-semibold text-lg mb-4">
-                Comentarios
-              </h3>
-
-              <textarea
-                value={comment}
-                onChange={(e) => setComment(e.target.value)}
-                placeholder="Escribe un comentario..."
-                className="
-                w-full
-                bg-white/60
-                rounded-2xl
-                p-4
-                outline-none
-                resize-none
-                text-gray-800
-                placeholder:text-gray-500
-                "
-                rows={3}
-              />
-
-              <div className="flex justify-end mt-4">
-
-                <button
-                  className="
-                  bg-[#d6bfa7]
-                  hover:bg-[#c9ae91]
-                  px-5
-                  py-2
-                  rounded-full
-                  transition
-                  "
-                >
-                  Comentar
-                </button>
-
+        <div className="flex-1 min-w-0">
+          <div onClick={onOpen} className="flex items-start justify-between gap-4 cursor-pointer">
+            <div className="min-w-0">
+              <div className="flex items-baseline gap-1.5 flex-wrap">
+                <span className="font-bold text-gray-900 text-[15px] hover:underline">{post.name}</span>
+                <span className="text-gray-400 text-xs truncate">{post.tag}</span>
               </div>
-
+              <div className="flex items-center gap-3 text-xs font-medium text-gray-400 mt-0.5 flex-wrap">
+                <div className="flex items-center gap-1"><Clock3 size={12} className="text-gray-400/80" /><span>{post.time}</span></div>
+                <div className="flex items-center gap-1"><MapPin size={12} className="text-gray-400/80" /><span>{post.location || "Monterrey, MX"}</span></div>
+              </div>
             </div>
 
+            {!post.isOwnPost && (
+              <button
+                onClick={handleFollow}
+                className={`flex items-center gap-1.5 transition-all duration-200 active:scale-95 px-4 py-1.5 rounded-full text-xs font-semibold shadow-sm ${post.following ? "bg-gray-100 text-gray-700 hover:bg-gray-200" : "bg-gray-950 text-white hover:bg-gray-800"}`}
+              >
+                {post.following ? <><Check size={13} strokeWidth={2.5} />Siguiendo</> : <><UserPlus size={13} strokeWidth={2.5} />Seguir</>}
+              </button>
+            )}
+          </div>
+
+          {editing ? (
+            <div className="mt-3" onClick={(e) => e.stopPropagation()}>
+              <textarea
+                value={editedText}
+                onChange={(e) => setEditedText(e.target.value)}
+                className="w-full bg-white/70 border border-gray-200/50 focus:border-gray-300 rounded-xl p-3 outline-none resize-none text-[15px] text-gray-800 transition-all focus:ring-2 focus:ring-gray-900/5"
+                rows={3}
+              />
+            </div>
+          ) : (
+            <p onClick={onOpen} className="mt-3 leading-relaxed text-[15px] text-gray-800 cursor-pointer whitespace-pre-wrap break-words">{post.text}</p>
           )}
 
+          {post.image && !editing && (
+            <div className="mt-3 overflow-hidden rounded-2xl border border-white/20 shadow-sm bg-black/5">
+              {post.image.match(/\.(mp4|webm|ogg)$/i) ? (
+                <video controls onClick={(e) => e.stopPropagation()} className="w-full max-h-[450px] object-cover"><source src={post.image} /></video>
+              ) : (
+                <img
+                  onClick={onOpen}
+                  src={post.image}
+                  alt="Contenido"
+                  className="w-full h-full object-cover cursor-pointer hover:scale-[1.01] transition-transform duration-300"
+                  onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                />
+              )}
+            </div>
+          )}
+
+          <div className="flex items-center justify-between mt-4 pt-1">
+            <div className="flex gap-6 text-gray-400 items-center">
+              <button onClick={(e) => { e.stopPropagation(); onLike?.(post.id); }} className={`flex items-center gap-1.5 text-xs font-semibold transition-colors duration-200 active:scale-95 ${post.liked ? 'text-pink-500' : 'hover:text-pink-500'}`}>
+                <Heart size={16} fill={post.liked ? "currentColor" : "none"} /><span>{post.likes}</span>
+              </button>
+              <button onClick={(e) => { e.stopPropagation(); onOpen?.(); }} className="flex items-center gap-1.5 text-xs font-semibold hover:text-blue-500 transition-colors duration-200">
+                <MessageCircle size={16} /><span>{post.comments}</span>
+              </button>
+            </div>
+
+            {post.isOwnPost && (
+              <div className="flex gap-3">
+                <button onClick={handleEdit} className="flex items-center gap-1 text-xs font-medium text-gray-400 hover:text-gray-700 transition-colors px-2 py-1 rounded-md hover:bg-white/50">
+                  <Pencil size={13} /><span>{editing ? "Guardar" : "Editar"}</span>
+                </button>
+                <button onClick={handleDelete} className="flex items-center gap-1 text-xs font-medium text-gray-400 hover:text-red-600 transition-colors px-2 py-1 rounded-md hover:bg-red-50/50">
+                  <Trash2 size={13} /><span>Eliminar</span>
+                </button>
+              </div>
+            )}
+          </div>
         </div>
-
       </div>
-
     </div>
   );
 }
