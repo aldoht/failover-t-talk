@@ -99,3 +99,13 @@ pub async fn user_followed_by(
 
     Ok(Json(response))
 }
+
+pub async fn delete_user(
+    State(db_pool): State<PgPool>,
+    claims: Claims,
+) -> Result<(StatusCode, &'static str), AppError> {
+    let user = db::users::get_user_by_id(&db_pool, claims.sub).await?;
+    db::users::delete_user(&db_pool, &user.user_id).await?;
+
+    Ok((StatusCode::NO_CONTENT, "Deleted user successfully."))
+}
