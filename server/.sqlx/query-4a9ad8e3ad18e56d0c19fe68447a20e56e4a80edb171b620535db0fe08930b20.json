@@ -1,0 +1,68 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        UPDATE users\n        SET name = COALESCE($2, name),\n            tag = COALESCE($3, tag),\n            profile_picture_url = COALESCE($4, profile_picture_url),\n            bio = COALESCE($5, bio)\n        WHERE user_id = $1\n        RETURNING user_id, name, tag, email, password, is_admin, profile_picture_url, bio\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "user_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "name",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 2,
+        "name": "tag",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 3,
+        "name": "email",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 4,
+        "name": "password",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 5,
+        "name": "is_admin",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 6,
+        "name": "profile_picture_url",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 7,
+        "name": "bio",
+        "type_info": "Varchar"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Varchar",
+        "Varchar",
+        "Text",
+        "Varchar"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      true
+    ]
+  },
+  "hash": "4a9ad8e3ad18e56d0c19fe68447a20e56e4a80edb171b620535db0fe08930b20"
+}

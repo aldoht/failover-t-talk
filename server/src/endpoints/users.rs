@@ -5,10 +5,11 @@ use axum::{
     extract::{Path, State},
 };
 use axum::http::StatusCode;
-use serde::{Serialize};
+use serde::{Serialize, Deserialize};
 use sqlx::{PgPool};
 
 use crate::{auth::{Claims}, errors::AppError};
+use crate::utils::{valid_bio, valid_name, valid_user_tag};
 use crate::db;
 
 #[derive(Debug, Serialize)]
@@ -17,6 +18,14 @@ pub struct UserResponse {
     pub tag: String,
     pub profile_picture_url: Option<String>,
     pub bio: Option<String>
+}
+
+#[derive(Deserialize)]
+pub struct UpdateUserRequest {
+    pub name: Option<String>,
+    pub tag: Option<String>,
+    pub profile_picture_url: Option<String>,
+    pub bio: Option<String>,
 }
 
 impl From<db::users::UserRecord> for UserResponse {
@@ -108,6 +117,45 @@ pub async fn delete_user(
     db::users::delete_user(&db_pool, &user.user_id).await?;
 
     Ok((StatusCode::NO_CONTENT, "Deleted user successfully."))
+}
+
+pub async fn update_user(
+    State(db_pool): State<PgPool>,
+    claims: Claims,
+    Json(body): Json<UpdateUserRequest>,
+) -> Result<Json<UserResponse>, AppError> {
+    if let Some(ref name) = body.name {
+        if !valid_name(name) {
+            return Err(AppError::BadRequest("Invalid name."));
+        }
+    }
+    if let Some(ref tag) = body.tag {
+        if !valid_user_tag(tag) {
+            return Err(AppError::BadRequest("Invalid tag."));
+        }
+    }
+    if let Some(ref bio) = body.bio {
+        if !valid_bio(bio) {
+            return Err(AppError::BadRequest("Invalid bio."));
+        }
+    }
+
+    let updated = db::users::update_user(
+        &db_pool,
+        &claims.sub,
+        body.name.as_deref(),
+        body.tag.as_deref(),
+        body.profile_picture_url.as_deref(),
+        body.bio.as_deref(),
+    )
+    .await
+    .map_err(|e| match &e {
+        sqlx::Error::Database(db_err) if db_err.constraint() == Some("users_tag_key") =>
+            AppError::Conflict("Tag already exists."),
+        _ => e.into(),
+    })?;
+
+    Ok(Json(updated.into()))
 }
 
 pub async fn me(

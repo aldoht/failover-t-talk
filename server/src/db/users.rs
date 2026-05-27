@@ -185,3 +185,34 @@ pub async fn delete_user(
 
     Ok(())
 }
+
+pub async fn update_user(
+    db_pool: &PgPool,
+    user_id: &Uuid,
+    name: Option<&str>,
+    tag: Option<&str>,
+    profile_picture_url: Option<&str>,
+    bio: Option<&str>,
+) -> Result<UserRecord, sqlx::Error> {
+    let rec: UserRecord = sqlx::query_as!(
+        UserRecord,
+        r#"
+        UPDATE users
+        SET name = COALESCE($2, name),
+            tag = COALESCE($3, tag),
+            profile_picture_url = COALESCE($4, profile_picture_url),
+            bio = COALESCE($5, bio)
+        WHERE user_id = $1
+        RETURNING user_id, name, tag, email, password, is_admin, profile_picture_url, bio
+        "#,
+        user_id,
+        name,
+        tag,
+        profile_picture_url,
+        bio,
+    )
+    .fetch_one(db_pool)
+    .await?;
+
+    Ok(rec)
+}
