@@ -40,11 +40,38 @@ export default function Login() {
       console.log("¡Login exitoso!", data);
 
       if (data.token) {
-        localStorage.setItem("token", data.token);
-        
-        localStorage.setItem("user_tag", data.user_tag || email.split('@')[0] || "usuario");
-        localStorage.setItem("user_name", data.user_name || "Usuario");
-      }
+  localStorage.setItem("token", data.token);
+
+  try {
+    const userRes = await fetch("http://localhost:8080/v1/users/me", {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${data.token}`,
+        "Content-Type": "application/json",
+      },
+    });
+
+    if (!userRes.ok) {
+      throw new Error("No se pudo obtener la información del usuario.");
+    }
+
+    const userData = await userRes.json();
+
+    console.log("Usuario autenticado:", userData);
+
+   
+    localStorage.setItem("user_name", userData.name);
+    localStorage.setItem("user_tag", userData.tag);
+
+    localStorage.setItem(
+      "user_profile_picture",
+      userData.profile_picture_url || "/default-user.png"
+    );
+
+  } catch (err) {
+    console.error("Error obteniendo usuario:", err);
+  }
+}
 
       window.location.href = "/";
 
@@ -148,7 +175,6 @@ export default function Login() {
           style={{ minHeight: "520px" }}
         >
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 600" preserveAspectRatio="xMidYMid slice" className="absolute inset-0 w-full h-full select-none pointer-events-none">
-            {/* SVG omitido por brevedad, es el mismo que proporcionaste */}
             <text x="250" y="365" textAnchor="middle" fontSize="52" fontWeight="900" letterSpacing="6" fill="#f0dfc0" opacity="0.95" style={{ fontFamily: "Georgia, serif" }}>T-Talk</text>
           </svg>
         </div>

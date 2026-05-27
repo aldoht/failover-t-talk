@@ -39,6 +39,7 @@ export default function ProfilePage({
   const [likedPosts, setLikedPosts] = useState<Post[]>([]);
 
   const [tempName, setTempName] = useState("");
+  const [tempTag, setTempTag] = useState("");
   const [tempBio, setTempBio] = useState("");
   const [tempLocation, setTempLocation] = useState("");
   const [tempPhotoUrl, setTempPhotoUrl] = useState("");
@@ -126,45 +127,80 @@ export default function ProfilePage({
   }
 
   async function handleSaveProfile() {
-    if (!tempName.trim()) return;
-    const token = localStorage.getItem("token");
-    setIsSaving(true);
+  if (!tempName.trim()) return;
 
-    try {
-      const res = await fetch(`http://localhost:8080/v1/users/${profileData.tag}`, {
-        method: "PUT",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          name: tempName,
-          bio: tempBio,
-          // profile_picture_url: tempPhotoUrl, // ← descomentar cuando el backend lo soporte
-        }),
-      });
+  const token = localStorage.getItem("token");
+  if (!token) return;
 
-      if (res.ok) {
-        setProfileData((prev) => ({
-          ...prev,
-          name: tempName,
-          bio: tempBio,
-          location: tempLocation,
-          // profile_picture_url: tempPhotoUrl || prev.profile_picture_url,
-        }));
-        localStorage.setItem("user_name", tempName);
-        window.dispatchEvent(new Event("profile-updated"));
-      }
-    } catch (err) {
-      console.error("Error guardando perfil:", err);
-    } finally {
-      setIsSaving(false);
-      setIsEditingProfile(false);
+  setIsSaving(true);
+
+  try {
+    const body: any = {};
+
+    if (tempName !== profileData.name) {
+      body.name = tempName;
     }
+
+    if (tempTag !== profileData.tag) {
+      body.tag = tempTag.replace("@", "");
+    }
+
+    if (tempBio !== profileData.bio) {
+      body.bio = tempBio;
+    }
+
+    if (tempPhotoUrl !== profileData.profile_picture_url) {
+      body.profile_picture_url = tempPhotoUrl;
+    }
+
+    const res = await fetch("http://localhost:8080/v1/users/me", {
+      method: "PUT",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(body),
+    });
+
+    if (!res.ok) {
+      throw new Error("No se pudo actualizar el perfil");
+    }
+
+    setProfileData((prev) => ({
+      ...prev,
+      name: tempName,
+      tag: tempTag.replace("@", ""),
+      bio: tempBio,
+      profile_picture_url:
+        tempPhotoUrl || prev.profile_picture_url,
+    }));
+
+    localStorage.setItem("user_name", tempName);
+    localStorage.setItem(
+      "user_tag",
+      tempTag.replace("@", "")
+    );
+
+    if (tempPhotoUrl) {
+      localStorage.setItem(
+        "user_profile_picture",
+        tempPhotoUrl
+      );
+    }
+
+    window.dispatchEvent(new Event("profile-updated"));
+
+    setIsEditingProfile(false);
+  } catch (err) {
+    console.error("Error guardando perfil:", err);
+  } finally {
+    setIsSaving(false);
   }
+}
 
   function handleOpenModal() {
     setTempName(profileData.name);
+    setTempTag(profileData.tag);
     setTempBio(profileData.bio);
     setTempLocation(profileData.location);
     setTempPhotoUrl(profileData.profile_picture_url);
@@ -183,14 +219,14 @@ export default function ProfilePage({
   }
 
   return (
-    <div className="space-y-6 animate-fade-in max-w-2xl mx-auto pb-12 w-full">
+    <div className="space-y-6 animate-fade-in max-w-5xl mx-auto pb-12 w-full">
       <div className="bg-white/80 backdrop-blur-2xl border border-white/40 rounded-[32px] overflow-hidden shadow-sm">
         <div className="h-40 bg-gradient-to-tr from-[#e6ccb2] via-[#ede0d4] to-[#ddc3a5] relative overflow-hidden">
           <div className="absolute inset-0 bg-white/10 backdrop-blur-[1px]" />
         </div>
 
         <div className="px-6 pb-6 relative">
-          {/* Foto + nombre */}
+        
           <div className="flex justify-between items-start gap-4">
             <div className="relative">
               <img
@@ -211,7 +247,6 @@ export default function ProfilePage({
               </div>
             </div>
 
-            {/* Botones — apilados verticalmente para que no choquen */}
             <div className="mt-4">
               <button
                 onClick={handleOpenModal}
@@ -261,7 +296,7 @@ export default function ProfilePage({
       </div>
 
       {/* Posts */}
-      <div className="space-y-4">
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
         {postsToRender.length > 0 ? (
           postsToRender.map((post) => (
             <PostCard
@@ -283,7 +318,6 @@ export default function ProfilePage({
         )}
       </div>
 
-      {/* Modal confirmar eliminar cuenta */}
       {showDeleteConfirm && (
         <div
           className="fixed inset-0 bg-black/50 backdrop-blur-md flex items-center justify-center z-50 p-4 animate-fade-in"
@@ -320,7 +354,7 @@ export default function ProfilePage({
         </div>
       )}
 
-      {/* Modal editar perfil */}
+      {/* editar perfil */}
       {isEditingProfile && (
         <div
           className="fixed inset-0 bg-black/40 backdrop-blur-md flex items-center justify-center z-50 p-4 animate-fade-in"
@@ -343,7 +377,7 @@ export default function ProfilePage({
             </div>
 
             <div className="space-y-3.5">
-              {/* Preview foto */}
+              {/*  foto */}
               <div className="flex items-center gap-4">
                 <img
                   src={tempPhotoUrl || profileData.profile_picture_url}
@@ -363,22 +397,35 @@ export default function ProfilePage({
                     value={tempPhotoUrl}
                     onChange={(e) => setTempPhotoUrl(e.target.value)}
                     placeholder="https://..."
-                    disabled // ← quitar cuando el backend soporte PUT con foto
-                    className="w-full bg-gray-100 border border-gray-200/60 rounded-xl px-3 py-2 text-xs text-gray-400 font-medium outline-none cursor-not-allowed"
-                    title="Disponible próximamente — pendiente de backend"
+                    className="w-full bg-gray-50/50 border border-gray-200/60 rounded-xl px-3 py-2 text-xs text-gray-900 font-medium outline-none focus:border-gray-300 transition"
+                    
                   />
-                  <p className="text-[10px] text-gray-400 mt-1">Próximamente disponible</p>
                 </div>
               </div>
 
               <div>
                 <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wide block mb-1">
-                  Nombre Público
+                  Nombre
                 </label>
                 <input
                   type="text"
                   value={tempName}
                   onChange={(e) => setTempName(e.target.value)}
+                  className="w-full bg-gray-50/50 border border-gray-200/60 rounded-xl px-3 py-2 text-xs text-gray-900 font-medium outline-none focus:border-gray-300 transition"
+                />
+              </div>
+
+              <div>
+                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wide block mb-1">
+                  Usuario
+                </label>
+
+                <input
+                  type="text"
+                  value={tempTag}
+                  onChange={(e) =>
+                    setTempTag(e.target.value.replace("@", ""))
+                  }
                   className="w-full bg-gray-50/50 border border-gray-200/60 rounded-xl px-3 py-2 text-xs text-gray-900 font-medium outline-none focus:border-gray-300 transition"
                 />
               </div>

@@ -41,10 +41,6 @@ export default function SearchPage({
     setQuery(initialQuery);
   }, [initialQuery]);
 
-  // Cargamos los tags que ya seguimos para el botón
- 
-
-  // Búsqueda de usuario en el backend con debounce
   useEffect(() => {
     if (activeFilter !== "users") {
       setFoundUser(null);
@@ -116,7 +112,6 @@ export default function SearchPage({
   return (
     <div className="w-full bg-white/80 backdrop-blur-2xl border border-white/40 rounded-[32px] p-6 shadow-sm flex flex-col h-[calc(100vh-48px)] overflow-hidden transition-all duration-300">
 
-      {/* Barra de búsqueda */}
       <div className="relative flex items-center mb-4 shrink-0">
         <Search className="absolute left-4 text-gray-400" size={18} strokeWidth={2.2} />
         <input
@@ -136,7 +131,7 @@ export default function SearchPage({
         )}
       </div>
 
-      {/* Filtros */}
+  
       <div className="flex gap-2 pb-4 border-b border-gray-100 shrink-0 overflow-x-auto no-scrollbar">
         {[
           { key: "all", icon: <Layers size={13} />, label: "Contenido" },
@@ -157,7 +152,6 @@ export default function SearchPage({
         ))}
       </div>
 
-      {/* Resultados */}
       <div className="flex-1 overflow-y-auto no-scrollbar pt-4">
         {query.trim() === "" ? (
           <div className="h-full flex flex-col items-center justify-center text-center p-6 opacity-60">
@@ -170,7 +164,7 @@ export default function SearchPage({
             </p>
           </div>
         ) : activeFilter === "users" ? (
-          // --- Búsqueda de usuarios por tag ---
+        
           <div className="space-y-3 animate-fade-in">
             {isSearchingUser ? (
               <div className="flex items-center justify-center py-12 gap-2 text-gray-400 text-xs font-medium">
@@ -198,7 +192,7 @@ export default function SearchPage({
                     </div>
                   </div>
 
-                  {/* No mostramos el botón si es el propio usuario */}
+               
                   {(foundUser.tag || "").replace("@", "") !== myTag && (
                     <button
                       onClick={() => handleFollowUser(foundUser.tag)}
@@ -217,7 +211,7 @@ export default function SearchPage({
                   )}
                 </div>
 
-                {/* Posts del usuario encontrado en el feed local */}
+                
                 {filteredPosts.length > 0 && (
                   <div className="mt-4 space-y-3">
                     <p className="text-[11px] font-bold text-gray-400 px-1 uppercase tracking-wider">
@@ -254,7 +248,6 @@ export default function SearchPage({
   );
 }
 
-// Componente auxiliar para mostrar un post en resultados
 function PostResult({
   post,
   onOpenPost,
