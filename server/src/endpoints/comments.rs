@@ -144,3 +144,14 @@ pub async fn get_post_replies(
     let response = build_comment_responses(&db_pool, comments).await?;
     Ok((StatusCode::OK, Json(response)))
 }
+
+pub async fn delete_comment(
+    State(db_pool): State<PgPool>,
+    claims: Claims,
+    Path(id): Path<Uuid>,
+) -> Result<(StatusCode, &'static str), AppError> {
+    let comment = db::comments::get_comment_by_id(&db_pool, id).await?;
+    db::comments::delete_comment(&db_pool, &comment.comment_id, &claims.sub).await?;
+
+    Ok((StatusCode::NO_CONTENT, "Deleted comment successfully."))
+}

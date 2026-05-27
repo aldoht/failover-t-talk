@@ -104,3 +104,14 @@ pub async fn get_post_by_id(
 
     Ok(Json(response))
 }
+
+pub async fn delete_post(
+    State(db_pool): State<PgPool>,
+    claims: Claims,
+    Path(id): Path<Uuid>,
+) -> Result<(StatusCode, &'static str), AppError> {
+    let post = db::posts::get_post_by_id(&db_pool, id).await?;
+    db::posts::delete_post(&db_pool, &post.post_id, &claims.sub).await?;
+
+    Ok((StatusCode::NO_CONTENT, "Deleted post successfully."))
+}

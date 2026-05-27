@@ -98,3 +98,19 @@ pub async fn get_target_comments(
 
     Ok(comments)
 }
+
+pub async fn delete_comment(
+    db_pool: &PgPool,
+    comment_id: &Uuid,
+    user_id: &Uuid,
+) -> Result<(), AppError> {
+    sqlx::query!(
+        "DELETE FROM comments WHERE user_id = $1 AND comment_id = $2",
+        user_id,
+        comment_id,
+    )
+    .execute(db_pool)
+    .await?;
+
+    Ok(())
+}
