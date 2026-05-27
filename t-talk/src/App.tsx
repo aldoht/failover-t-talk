@@ -34,7 +34,6 @@ export default function App() {
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [likedPostIds, setLikedPostIds] = useState<Set<string>>(new Set());
 
-  // Carga el feed completo: tus posts + posts de todos los que sigues
   const loadPosts = async () => {
   const token = localStorage.getItem("token");
   let myTag = localStorage.getItem("user_tag");
@@ -384,12 +383,12 @@ export default function App() {
 
   return (
     <div className="min-h-screen text-gray-800 bg-gradient-to-br from-gray-50 via-gray-100 to-zinc-200/70 attachment-fixed font-sans antialiased">
-      <div className="max-w-[1400px] mx-auto grid lg:grid-cols-[260px_1fr] gap-6 px-4 lg:px-6">
+      <div className="max-w-[1700px] mx-auto grid lg:grid-cols-[260px_minmax(0,1fr)] gap-6 px-4 lg:px-6">
         <div className="hidden lg:block sticky top-0 h-screen py-6">
           <Sidebar page={page} setPage={handlePageChange} />
         </div>
-        <main className="py-6 pb-32 lg:pb-6">
-          <div className="bg-white/30 backdrop-blur-3xl border border-white/40 rounded-[32px] overflow-hidden shadow-xl min-h-[85vh]">
+        <main className="py-6 pb-32 lg:pb-6 w-full">
+          <div className="bg-white/40 backdrop-blur-3xl border border-white/40 rounded-[32px] overflow-hidden shadow-xl min-h-[85vh] w-full">
             <div className="sticky top-0 z-40 backdrop-blur-xl bg-white/50 border-b border-gray-200/20 px-6 py-5 flex items-center justify-between">
               <h1 className="text-2xl font-black tracking-tight text-gray-900 capitalize">
                 {page === "home" ? "Inicio" : page}
