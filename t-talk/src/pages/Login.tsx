@@ -59,14 +59,13 @@ export default function Login() {
 
     console.log("Usuario autenticado:", userData);
 
-    // Datos reales del backend
-    localStorage.setItem("user_name", userData.name || "");
-    localStorage.setItem("user_tag", userData.tag || "");
+   
+    localStorage.setItem("user_name", userData.name);
+    localStorage.setItem("user_tag", userData.tag);
 
-    // Foto prefijada/default
     localStorage.setItem(
       "user_profile_picture",
-      "/default-user.png"
+      userData.profile_picture_url || "/default-user.png"
     );
 
   } catch (err) {
@@ -176,7 +175,6 @@ export default function Login() {
           style={{ minHeight: "520px" }}
         >
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 600" preserveAspectRatio="xMidYMid slice" className="absolute inset-0 w-full h-full select-none pointer-events-none">
-            {/* SVG omitido por brevedad, es el mismo que proporcionaste */}
             <text x="250" y="365" textAnchor="middle" fontSize="52" fontWeight="900" letterSpacing="6" fill="#f0dfc0" opacity="0.95" style={{ fontFamily: "Georgia, serif" }}>T-Talk</text>
           </svg>
         </div>

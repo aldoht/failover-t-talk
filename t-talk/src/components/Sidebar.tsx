@@ -24,7 +24,6 @@ export default function Sidebar({
     { id: "profile", label: "Perfil", icon: User },
   ];
 
-  // Datos reales del usuario desde localStorage (se guardan al hacer login)
   const userName = localStorage.getItem("user_name") || "Usuario";
   const userTag = (localStorage.getItem("user_tag") || "").replace("@", "");
   const userAvatar = localStorage.getItem("user_profile_picture_url") ||

@@ -3,7 +3,6 @@ import Sidebar from "./components/Sidebar";
 import BottomBar from "./components/BottomBar";
 import CreatePost from "./components/CreatePost";
 import PostCard from "./components/PostCard";
-import RightPanel from "./components/RightPanel";
 import PostModal from "./components/PostModal";
 import SearchPage from "./pages/SearchPage";
 import ProfilePage from "./pages/ProfilePage";
@@ -58,7 +57,7 @@ export default function App() {
     const cleanFollowedTags = (followingList || []).map((u) =>
       (u.tag || "").replace("@", "")
     );
-    setFollowedTags(cleanFollowedTags); // para el resto de la app
+    setFollowedTags(cleanFollowedTags); 
 
     const followingPostsArrays = await Promise.all(
       cleanFollowedTags.map(async (tag) => {
@@ -174,7 +173,7 @@ export default function App() {
         setFollowedTags((prev) =>
           isFollowing ? prev.filter((t) => t !== cleanTag) : [...prev, cleanTag]
         );
-        // Recargamos el feed para incluir/excluir posts del usuario seguido
+      
         loadPosts();
       }
     } catch (err) {
@@ -385,7 +384,7 @@ export default function App() {
 
   return (
     <div className="min-h-screen text-gray-800 bg-gradient-to-br from-gray-50 via-gray-100 to-zinc-200/70 attachment-fixed font-sans antialiased">
-      <div className="max-w-[1400px] mx-auto grid lg:grid-cols-[260px_1fr_360px] gap-6 px-4 lg:px-6">
+      <div className="max-w-[1400px] mx-auto grid lg:grid-cols-[260px_1fr] gap-6 px-4 lg:px-6">
         <div className="hidden lg:block sticky top-0 h-screen py-6">
           <Sidebar page={page} setPage={handlePageChange} />
         </div>
@@ -399,13 +398,6 @@ export default function App() {
             <div className="p-4 lg:p-6">{renderPage()}</div>
           </div>
         </main>
-        <div className="hidden lg:block sticky top-0 h-screen py-6 overflow-y-auto no-scrollbar">
-          <RightPanel
-            onSearchTrend={(hashtag) => { setSearchQuery(hashtag); setPage("search"); }}
-            onFollowSuggestion={(tag) => handleToggleFollow(tag.toString())}
-            followedUserIds={followedTags as any}
-          />
-        </div>
       </div>
       <BottomBar page={page} setPage={handlePageChange} />
       <PostModal

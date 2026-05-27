@@ -36,7 +36,6 @@ export default function Signup({ onSuccess }: { onSuccess?: () => void }) {
       });
 
       if (!response.ok) {
-        // Mensajes específicos por código de error
         if (response.status === 409) {
           const text = await response.text().catch(() => "");
           if (text.toLowerCase().includes("email")) {
@@ -69,11 +68,9 @@ export default function Signup({ onSuccess }: { onSuccess?: () => void }) {
       if (data.token) {
         localStorage.setItem("token", data.token);
 
-        // Usar el tag que el usuario escribió (ya validado por el backend)
         localStorage.setItem("user_tag", formattedTag);
         localStorage.setItem("user_name", name.trim());
 
-        // Obtener datos completos del perfil desde el backend
         try {
           const userRes = await fetch(`http://localhost:8080/v1/users/${formattedTag}`, {
             headers: { "Authorization": `Bearer ${data.token}` },
@@ -84,11 +81,10 @@ export default function Signup({ onSuccess }: { onSuccess?: () => void }) {
             localStorage.setItem("user_profile_picture_url", userData.profile_picture_url || "");
           }
         } catch {
-          // Si falla el GET, ya tenemos los datos básicos guardados
+          
         }
       }
 
-      // Redirigir al inicio
       if (onSuccess) {
         onSuccess?.();
       } else {
