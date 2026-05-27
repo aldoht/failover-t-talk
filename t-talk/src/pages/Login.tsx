@@ -40,11 +40,39 @@ export default function Login() {
       console.log("¡Login exitoso!", data);
 
       if (data.token) {
-        localStorage.setItem("token", data.token);
-        
-        localStorage.setItem("user_tag", data.user_tag || email.split('@')[0] || "usuario");
-        localStorage.setItem("user_name", data.user_name || "Usuario");
-      }
+  localStorage.setItem("token", data.token);
+
+  try {
+    const userRes = await fetch("http://localhost:8080/v1/users/me", {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${data.token}`,
+        "Content-Type": "application/json",
+      },
+    });
+
+    if (!userRes.ok) {
+      throw new Error("No se pudo obtener la información del usuario.");
+    }
+
+    const userData = await userRes.json();
+
+    console.log("Usuario autenticado:", userData);
+
+    // Datos reales del backend
+    localStorage.setItem("user_name", userData.name || "");
+    localStorage.setItem("user_tag", userData.tag || "");
+
+    // Foto prefijada/default
+    localStorage.setItem(
+      "user_profile_picture",
+      "/default-user.png"
+    );
+
+  } catch (err) {
+    console.error("Error obteniendo usuario:", err);
+  }
+}
 
       window.location.href = "/";
 
