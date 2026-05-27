@@ -26,8 +26,8 @@ export default function Sidebar({
 
   const userName = localStorage.getItem("user_name") || "Usuario";
   const userTag = (localStorage.getItem("user_tag") || "").replace("@", "");
-  const userAvatar = localStorage.getItem("user_profile_picture_url") ||
-    "https://images.unsplash.com/photo-1494790108377-be9c29b29330?q=80&w=400";
+  const userAvatar = localStorage.getItem("user_profile_picture") ||
+    "https://upload.wikimedia.org/wikipedia/commons/b/b1/Missing-image-232x150.png";
 
   function handleLogout() {
     localStorage.clear();

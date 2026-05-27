@@ -24,7 +24,7 @@ export default function Signup({ onSuccess }: { onSuccess?: () => void }) {
     setIsLoading(true);
 
     try {
-      const response = await fetch("http://localhost:8080/v1/auth/signup", {
+      const response = await fetch("/v1/auth/signup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -72,16 +72,16 @@ export default function Signup({ onSuccess }: { onSuccess?: () => void }) {
         localStorage.setItem("user_name", name.trim());
 
         try {
-          const userRes = await fetch(`http://localhost:8080/v1/users/${formattedTag}`, {
+          const userRes = await fetch(`/v1/users/${formattedTag}`, {
             headers: { "Authorization": `Bearer ${data.token}` },
           });
           if (userRes.ok) {
             const userData = await userRes.json();
             localStorage.setItem("user_name", userData.name || name.trim());
-            localStorage.setItem("user_profile_picture_url", userData.profile_picture_url || "");
+            localStorage.setItem("user_profile_picture_url", userData.profile_picture_url || "https://upload.wikimedia.org/wikipedia/commons/b/b1/Missing-image-232x150.png");
           }
-        } catch {
-          
+        } catch (e) {
+          console.log(e)
         }
       }
 

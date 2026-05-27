@@ -42,10 +42,10 @@ export default function App() {
 
   try {
     const [myPostsRes, followingRes] = await Promise.all([
-      fetch(`http://localhost:8080/v1/users/${myTag}/posts`, {
+      fetch(`/v1/users/${myTag}/posts`, {
         headers: { "Authorization": `Bearer ${token}` },
       }),
-      fetch(`http://localhost:8080/v1/users/${myTag}/following`, {
+      fetch(`/v1/users/${myTag}/following`, {
         headers: { "Authorization": `Bearer ${token}` },
       }),
     ]);
@@ -61,7 +61,7 @@ export default function App() {
     const followingPostsArrays = await Promise.all(
       cleanFollowedTags.map(async (tag) => {
         try {
-          const res = await fetch(`http://localhost:8080/v1/users/${tag}/posts`, {
+          const res = await fetch(`/v1/users/${tag}/posts`, {
             headers: { "Authorization": `Bearer ${token}` },
           });
           if (!res.ok) return [];
@@ -122,7 +122,7 @@ export default function App() {
 
     try {
       if (alreadyLiked) {
-        await fetch(`http://localhost:8080/v1/posts/${postId}/likes/me`, {
+        await fetch(`/v1/posts/${postId}/likes/me`, {
           method: "DELETE",
           headers: { "Authorization": `Bearer ${token}` },
         });
@@ -137,7 +137,7 @@ export default function App() {
           return next;
         });
       } else {
-        await fetch(`http://localhost:8080/v1/posts/${postId}/likes`, {
+        await fetch(`/v1/posts/${postId}/likes`, {
           method: "POST",
           headers: { "Authorization": `Bearer ${token}` },
         });
@@ -160,7 +160,7 @@ export default function App() {
 
     const isFollowing = followedTags.includes(cleanTag);
     try {
-      const url = `http://localhost:8080/v1/users/${cleanTag}/followers`;
+      const url = `/v1/users/${cleanTag}/followers`;
       const response = await fetch(isFollowing ? `${url}/me` : url, {
         method: isFollowing ? "DELETE" : "POST",
         headers: {
@@ -184,7 +184,7 @@ export default function App() {
     const token = localStorage.getItem("token");
     if (!token) return;
     try {
-      await fetch(`http://localhost:8080/v1/posts/${postId}/comments`, {
+      await fetch(`/v1/posts/${postId}/comments`, {
         method: "POST",
         headers: {
           "Authorization": `Bearer ${token}`,
@@ -209,7 +209,7 @@ export default function App() {
     if (!token) return;
 
     try {
-      const response = await fetch(`http://localhost:8080/v1/posts/${postId}/me`, {
+      const response = await fetch(`/v1/posts/${postId}/me`, {
         method: "DELETE",
         headers: { "Authorization": `Bearer ${token}` },
       });
@@ -227,7 +227,7 @@ export default function App() {
     if (!token) return;
 
     try {
-      const response = await fetch(`http://localhost:8080/v1/comments/${commentId}/me`, {
+      const response = await fetch(`/v1/comments/${commentId}/me`, {
         method: "DELETE",
         headers: { "Authorization": `Bearer ${token}` },
       });
@@ -252,7 +252,7 @@ export default function App() {
     if (!token) return;
 
     try {
-      await fetch(`http://localhost:8080/v1/posts/${postId}`, {
+      await fetch(`/v1/posts/${postId}`, {
         method: "PUT",
         headers: {
           "Authorization": `Bearer ${token}`,
@@ -289,7 +289,7 @@ export default function App() {
       tag: cleanTag,
       avatar:
         p.user_profile_pic_url ||
-        "https://images.unsplash.com/photo-1494790108377-be9c29b29330?q=80&w=400",
+        "https://upload.wikimedia.org/wikipedia/commons/b/b1/Missing-image-232x150.png",
       text: p.text,
       time: new Date(p.created_at).toLocaleDateString(),
       likes: p.like_count,

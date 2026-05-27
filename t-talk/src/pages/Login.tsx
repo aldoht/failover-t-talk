@@ -20,7 +20,7 @@ export default function Login() {
     setIsLoading(true);
 
     try {
-      const response = await fetch("http://localhost:8080/v1/auth/login", {
+      const response = await fetch("/v1/auth/login", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -43,7 +43,7 @@ export default function Login() {
   localStorage.setItem("token", data.token);
 
   try {
-    const userRes = await fetch("http://localhost:8080/v1/users/me", {
+    const userRes = await fetch("/v1/users/me", {
       method: "GET",
       headers: {
         Authorization: `Bearer ${data.token}`,
@@ -65,7 +65,7 @@ export default function Login() {
 
     localStorage.setItem(
       "user_profile_picture",
-      userData.profile_picture_url || "/default-user.png"
+      userData.profile_picture_url || "https://upload.wikimedia.org/wikipedia/commons/b/b1/Missing-image-232x150.png"
     );
 
   } catch (err) {

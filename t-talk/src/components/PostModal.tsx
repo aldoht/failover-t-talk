@@ -5,7 +5,6 @@ import {
   MessageCircle,
   UserPlus,
   Check,
-  Pencil,
   Trash2,
   X,
   MapPin,
@@ -57,7 +56,7 @@ export default function PostModal({
   const fetchComments = async (postId: string) => {
     const token = localStorage.getItem("token");
     try {
-      const res = await fetch(`http://localhost:8080/v1/posts/${postId}/comments`, {
+      const res = await fetch(`/v1/posts/${postId}/comments`, {
         headers: { "Authorization": `Bearer ${token}` },
       });
       if (!res.ok) return;
@@ -83,19 +82,13 @@ export default function PostModal({
 
   if (!post) return null;
 
-  function handleSaveEdit() {
-    if (!editedText.trim()) return;
-    onEdit(post!.id, editedText);
-    setEditing(false);
-  }
-
   async function handleToggleLike() {
     const token = localStorage.getItem("token");
     if (!token) return;
 
     if (liked) {
       // Unlike
-      await fetch(`http://localhost:8080/v1/posts/${post!.id}/likes/me`, {
+      await fetch(`/v1/posts/${post!.id}/likes/me`, {
         method: "DELETE",
         headers: { "Authorization": `Bearer ${token}` },
       });
@@ -103,7 +96,7 @@ export default function PostModal({
       setLikeCount((c) => Math.max(0, c - 1));
     } else {
       // Like
-      await fetch(`http://localhost:8080/v1/posts/${post!.id}/likes`, {
+      await fetch(`/v1/posts/${post!.id}/likes`, {
         method: "POST",
         headers: { "Authorization": `Bearer ${token}` },
       });
@@ -130,7 +123,7 @@ export default function PostModal({
     if (!token) return;
 
     try {
-      const res = await fetch(`http://localhost:8080/v1/comments/${commentId}/me`, {
+      const res = await fetch(`/v1/comments/${commentId}/me`, {
         method: "DELETE",
         headers: { "Authorization": `Bearer ${token}` },
       });
@@ -154,12 +147,12 @@ export default function PostModal({
 
   try {
     if (alreadyLiked) {
-      await fetch(`http://localhost:8080/v1/comments/${commentId}/likes/me`, {
+      await fetch(`/v1/comments/${commentId}/likes/me`, {
         method: "DELETE",
         headers: { "Authorization": `Bearer ${token}` },
       });
     } else {
-      await fetch(`http://localhost:8080/v1/comments/${commentId}/likes`, {
+      await fetch(`/v1/comments/${commentId}/likes`, {
         method: "POST",
         headers: { "Authorization": `Bearer ${token}` },
       });
@@ -233,13 +226,6 @@ export default function PostModal({
             ) : (
               <div className="flex gap-2">
                 <button
-                  onClick={() => (editing ? handleSaveEdit() : setEditing(true))}
-                  className="px-3.5 py-1.5 rounded-full text-xs font-semibold border border-gray-200 bg-white hover:bg-gray-50 transition flex items-center gap-1 text-gray-700"
-                >
-                  <Pencil size={13} />
-                  {editing ? "Guardar" : "Editar"}
-                </button>
-                <button
                   onClick={onDelete}
                   className="px-3.5 py-1.5 rounded-full text-xs font-semibold bg-red-50 text-red-600 hover:bg-red-100 transition flex items-center gap-1"
                 >
@@ -309,7 +295,7 @@ export default function PostModal({
                   <div className="flex justify-between items-start gap-2">
                     <div className="flex gap-3 min-w-0">
                       <img
-                        src={c.user_profile_pic_url || "https://images.unsplash.com/photo-1494790108377-be9c29b29330?q=80&w=400"}
+                        src={c.user_profile_pic_url || "https://upload.wikimedia.org/wikipedia/commons/b/b1/Missing-image-232x150.png"}
                         alt={c.user_name}
                         className="w-9 h-9 rounded-full object-cover shrink-0"
                       />

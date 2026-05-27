@@ -52,13 +52,13 @@ export default function ProfilePage({
 
       try {
         const [userRes, followersRes, followingRes] = await Promise.all([
-          fetch(`http://localhost:8080/v1/users/${myTag}`, {
+          fetch(`/v1/users/${myTag}`, {
             headers: { Authorization: `Bearer ${token}` },
           }),
-          fetch(`http://localhost:8080/v1/users/${myTag}/followers`, {
+          fetch(`/v1/users/${myTag}/followers`, {
             headers: { Authorization: `Bearer ${token}` },
           }),
-          fetch(`http://localhost:8080/v1/users/${myTag}/following`, {
+          fetch(`/v1/users/${myTag}/following`, {
             headers: { Authorization: `Bearer ${token}` },
           }),
         ]);
@@ -66,12 +66,10 @@ export default function ProfilePage({
         if (userRes.ok) {
           const userData = await userRes.json();
           setProfileData({
-            name: userData.name || localStorage.getItem("user_name") || "Usuario",
-            tag: userData.tag || myTag,
-            bio: userData.bio || "¡Hola! Estoy usando T-Talk.",
-            profile_picture_url:
-              userData.profile_picture_url ||
-              "https://images.unsplash.com/photo-1494790108377-be9c29b29330?q=80&w=400",
+            name: userData.name,
+            tag: userData.tag,
+            bio: userData.bio,
+            profile_picture_url: userData.profile_picture_url || "https://upload.wikimedia.org/wikipedia/commons/b/b1/Missing-image-232x150.png",
             location: "Monterrey, MX",
           });
         } else {
@@ -80,7 +78,7 @@ export default function ProfilePage({
             tag: myTag,
             bio: "¡Hola! Estoy usando T-Talk.",
             profile_picture_url:
-              "https://images.unsplash.com/photo-1494790108377-be9c29b29330?q=80&w=400",
+              "https://upload.wikimedia.org/wikipedia/commons/b/b1/Missing-image-232x150.png",
             location: "Monterrey, MX",
           });
         }
@@ -115,7 +113,7 @@ export default function ProfilePage({
     const token = localStorage.getItem("token");
     if (!token) return;
 
-    const res = await fetch("http://localhost:8080/v1/users/me", {
+    const res = await fetch("/v1/users/me", {
       method: "DELETE",
       headers: { Authorization: `Bearer ${token}` },
     });
@@ -153,8 +151,8 @@ export default function ProfilePage({
       body.profile_picture_url = tempPhotoUrl;
     }
 
-    const res = await fetch("http://localhost:8080/v1/users/me", {
-      method: "PUT",
+    const res = await fetch("/v1/users/me", {
+      method: "PATCH",
       headers: {
         Authorization: `Bearer ${token}`,
         "Content-Type": "application/json",
@@ -385,7 +383,7 @@ export default function ProfilePage({
                   className="w-14 h-14 rounded-full object-cover border-2 border-white shadow"
                   onError={(e) => {
                     (e.target as HTMLImageElement).src =
-                      "https://images.unsplash.com/photo-1494790108377-be9c29b29330?q=80&w=400";
+                      "https://upload.wikimedia.org/wikipedia/commons/b/b1/Missing-image-232x150.png";
                   }}
                 />
                 <div className="flex-1 min-w-0">

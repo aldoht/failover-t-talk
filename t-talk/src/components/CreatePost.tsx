@@ -14,20 +14,20 @@ export default function CreatePost({ onAddPost }: Props) {
   const [myUserData, setMyUserData] = useState({
     name: "Cargando...",
     tag: "...",
-    avatar: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?q=80&w=400",
+    avatar: "https://upload.wikimedia.org/wikipedia/commons/b/b1/Missing-image-232x150.png",
   });
 
   useEffect(() => {
     function syncFromStorage() {
       const savedName = localStorage.getItem("user_name");
       const savedTag = localStorage.getItem("user_tag");
-      const savedAvatar = localStorage.getItem("user_profile_picture_url");
+      const savedAvatar = localStorage.getItem("user_profile_picture");
       setMyUserData({
         name: savedName || "Usuario de T-Talk",
         tag: savedTag || "usuario",
         avatar:
           savedAvatar ||
-          "https://images.unsplash.com/photo-1494790108377-be9c29b29330?q=80&w=400",
+          "https://upload.wikimedia.org/wikipedia/commons/b/b1/Missing-image-232x150.png",
       });
     }
 
@@ -51,7 +51,7 @@ export default function CreatePost({ onAddPost }: Props) {
     setIsLoading(true);
 
     try {
-      const response = await fetch("http://localhost:8080/v1/posts", {
+      const response = await fetch("/v1/posts", {
         method: "POST",
         headers: {
           Authorization: `Bearer ${token}`,
@@ -87,7 +87,7 @@ export default function CreatePost({ onAddPost }: Props) {
     <div className="bg-white/80 backdrop-blur-2xl border border-white/40 rounded-[32px] p-6 shadow-sm transition-all duration-300">
       <div className="flex gap-4 items-start">
         <img
-          src={myUserData.avatar}
+          src={myUserData.avatar || "https://upload.wikimedia.org/wikipedia/commons/b/b1/Missing-image-232x150.png"}
           alt={myUserData.name}
           className="w-11 h-11 rounded-full object-cover shadow-inner shrink-0 mt-1"
         />

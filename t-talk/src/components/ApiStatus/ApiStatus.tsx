@@ -10,7 +10,7 @@ export default function ApiStatus() {
   
   // Change later because of docker instance
   useEffect(() => {
-    fetch("http://localhost:8080/api/status")
+    fetch("/api/status")
       .then(r => r.json())
       .then(setStatus);
   }, []);

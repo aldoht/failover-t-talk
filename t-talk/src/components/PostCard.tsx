@@ -4,7 +4,6 @@ import {
   MessageCircle,
   UserPlus,
   Check,
-  Pencil,
   Trash2,
   Clock3,
   MapPin
@@ -42,14 +41,6 @@ export default function PostCard({
     onFollow?.(post.tag);
   }
 
-  function handleEdit(e: React.MouseEvent) {
-    e.stopPropagation();
-    if (editing) {
-      onEdit?.(post.id, editedText); // Envía ID primero, luego el texto modificado
-    }
-    setEditing(!editing);
-  }
-
   function handleDelete(e: React.MouseEvent) {
     e.stopPropagation();
     onDelete?.(post.id);
@@ -59,7 +50,7 @@ export default function PostCard({
     <div className="bg-white/40 backdrop-blur-xl border border-white/30 rounded-[24px] p-5 hover:bg-white/60 transition-all duration-300 shadow-sm hover:shadow-md">
       <div className="flex gap-4">
         <img
-          src={post.avatar || "https://images.unsplash.com/photo-1494790108377-be9c29b29330?q=80&w=400"}
+          src={post.avatar || "https://upload.wikimedia.org/wikipedia/commons/b/b1/Missing-image-232x150.png"}
           alt={`Avatar de ${post.name}`}
           className="w-12 h-12 rounded-full object-cover shadow-inner shrink-0"
         />
@@ -128,9 +119,6 @@ export default function PostCard({
 
             {post.isOwnPost && (
               <div className="flex gap-3">
-                <button onClick={handleEdit} className="flex items-center gap-1 text-xs font-medium text-gray-400 hover:text-gray-700 transition-colors px-2 py-1 rounded-md hover:bg-white/50">
-                  <Pencil size={13} /><span>{editing ? "Guardar" : "Editar"}</span>
-                </button>
                 <button onClick={handleDelete} className="flex items-center gap-1 text-xs font-medium text-gray-400 hover:text-red-600 transition-colors px-2 py-1 rounded-md hover:bg-red-50/50">
                   <Trash2 size={13} /><span>Eliminar</span>
                 </button>

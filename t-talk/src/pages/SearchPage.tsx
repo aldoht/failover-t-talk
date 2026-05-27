@@ -64,7 +64,7 @@ export default function SearchPage({
       setUserNotFound(false);
 
       try {
-        const res = await fetch(`http://localhost:8080/v1/users/${cleanQuery}`, {
+        const res = await fetch(`/v1/users/${cleanQuery}`, {
           headers: { "Authorization": `Bearer ${token}` },
         });
 
@@ -179,7 +179,7 @@ export default function SearchPage({
                 <div className="p-4 bg-gray-50/50 border border-gray-100 rounded-2xl flex items-center justify-between gap-3">
                   <div className="flex items-center gap-3 min-w-0">
                     <img
-                      src={foundUser.profile_picture_url || "https://images.unsplash.com/photo-1494790108377-be9c29b29330?q=80&w=400"}
+                      src={foundUser.profile_picture_url || "https://upload.wikimedia.org/wikipedia/commons/b/b1/Missing-image-232x150.png"}
                       alt={foundUser.name}
                       className="w-12 h-12 rounded-full object-cover shrink-0"
                     />

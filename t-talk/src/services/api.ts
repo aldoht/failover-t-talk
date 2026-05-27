@@ -30,7 +30,7 @@ export type Post = {
   commentsData: CommentType[];
 };
 
-const API_URL = "http://localhost:8080/v1";
+const API_URL = "/v1";
 
 function getAuthHeaders(): Record<string, string> {
   const token = localStorage.getItem("token");
