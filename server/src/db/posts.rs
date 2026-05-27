@@ -3,8 +3,6 @@ use serde::Serialize;
 use sqlx::{PgPool};
 use uuid::Uuid;
 
-use crate::errors::AppError;
-
 #[derive(Debug, Serialize)]
 pub struct PostRecord {
     pub post_id: uuid::Uuid,
@@ -75,7 +73,7 @@ pub async fn delete_post(
     db_pool: &PgPool,
     post_id: &Uuid,
     user_id: &Uuid,
-) -> Result<(), AppError> {
+) -> Result<(), sqlx::Error> {
     sqlx::query!(
         "DELETE FROM posts WHERE user_id = $1 AND post_id = $2",
         user_id,
