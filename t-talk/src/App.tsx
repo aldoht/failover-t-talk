@@ -1,227 +1,206 @@
-import { useState } from "react";
-
+import { useState, useEffect } from "react";
 import Sidebar from "./components/Sidebar";
 import BottomBar from "./components/BottomBar";
 import CreatePost from "./components/CreatePost";
 import PostCard from "./components/PostCard";
 import RightPanel from "./components/RightPanel";
 import PostModal from "./components/PostModal";
-
-import Login from "./pages/Login";
+import Signup from "./pages/Signup";
 import SearchPage from "./pages/SearchPage";
 import ProfilePage from "./pages/ProfilePage";
 import FollowingPage from "./pages/FollowingPage";
 import NotificationsPage from "./pages/NotificationPage";
 
-import { mockPosts } from "./mock/posts";
 import type { Post } from "./services/api";
 
+export interface BackendPost {
+  post_id: string;
+  user_name: string;
+  user_tag: string;
+  user_profile_pic_url?: string;
+  text: string;
+  created_at: string;
+  media_urls?: string[];
+  like_count: number;
+  comment_count?: number; 
+}
+
 export default function App() {
-  const [loggedIn] = useState(true);
+  const [isLoggedIn, setIsLoggedIn] = useState<boolean>(false);
   const [page, setPage] = useState("home");
-  const [posts, setPosts] = useState<Post[]>(mockPosts);
-  const [selectedPost, setSelectedPost] = useState<Post | null>(null);
+  const [posts, setPosts] = useState<BackendPost[]>([]);
+  const [selectedPost, setSelectedPost] = useState<BackendPost | null>(null);
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [followedTags, setFollowedTags] = useState<string[]>([]);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+
+  // 🌟 ESTA ES LA FUNCIÓN MÁGICA QUE DESCARGA LOS DATOS REALES 🌟
+  const loadPosts = async () => {
+    const token = localStorage.getItem("token");
+    let myTag = localStorage.getItem("user_tag");
+    if (!token || !myTag) return;
+    myTag = myTag.replace("@", "");
+
+    try {
+      const response = await fetch(`http://localhost:8080/v1/users/${myTag}/posts`, {
+        headers: {
+          "Authorization": `Bearer ${token}`,
+          "Content-Type": "application/json"
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setPosts(data || []); // Guardamos los posts reales de AWS
+      }
+    } catch (err) {
+      console.error("Error recuperando los posts:", err);
+    }
+  };
+
+  useEffect(() => {
+    const token = localStorage.getItem("token");
+    if (token) {
+      setIsLoggedIn(true);
+      loadPosts(); // 1. Soluciona la amnesia (se llama al recargar la página)
+    }
+    setIsLoading(false);
+  }, []);
 
   const handlePageChange = (newPage: string) => {
-    if (newPage !== "search") {
-      setSearchQuery(""); 
-    }
+    if (newPage !== "search") setSearchQuery(""); 
     setPage(newPage);
   };
 
-  function handleAddPost(post: Post) {
-    setPosts([post, ...posts]);
+  function handleAddPost(newPost: any) {
+    // 2. Soluciona el ID falso (Descargamos los posts reales en vez de inventar uno)
+    // Cuando CreatePost termina de enviar a AWS, esto baja el post con el UUID real.
+    loadPosts(); 
   }
 
-  function handleToggleLike(postId: string | number) {
-    setPosts((prev) =>
-      prev.map((post) => {
-        if (post.id === postId) {
-          const liked = !post.liked;
-          return {
-            ...post,
-            liked,
-            likes: liked ? post.likes + 1 : post.likes - 1,
-          };
-        }
-        return post;
-      })
-    );
+  async function handleToggleLike(postId: string) {
+    const token = localStorage.getItem("token");
+    if (!token) return;
 
-    if (selectedPost && selectedPost.id === postId) {
-      const updatedLiked = !selectedPost.liked;
-      setSelectedPost({
-        ...selectedPost,
-        liked: updatedLiked,
-        likes: updatedLiked ? selectedPost.likes + 1 : selectedPost.likes - 1,
+    try {
+      await fetch(`http://localhost:8080/v1/posts/${postId}/likes`, {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${token}`,
+          "Content-Type": "application/json"
+        }
       });
+      setPosts((prev) =>
+        prev.map((post) => post.post_id === postId ? { ...post, like_count: post.like_count + 1 } : post)
+      );
+    } catch (err) {
+      console.error("Error al dar like:", err);
     }
   }
 
-  function handleToggleFollow(identifier: string | number) {
-    let targetTag = "";
+  async function handleToggleFollow(targetTag: string) {
+    const token = localStorage.getItem("token");
+    const cleanTag = targetTag.replace("@", "");
+    if (!token) return;
 
-    if (typeof identifier === "number" || (typeof identifier === "string" && !identifier.startsWith("@"))) {
-      if (identifier === 10 || identifier === "10") targetTag = "@sophia";
-      else if (identifier === 11 || identifier === "11") targetTag = "@danlee";
-      else if (identifier === 12 || identifier === "12") targetTag = "@daniel";
-      else {
-        const foundPost = posts.find((p) => p.id === identifier);
-        if (foundPost) targetTag = foundPost.tag;
+    const isFollowing = followedTags.includes(cleanTag);
+    try {
+      const url = `http://localhost:8080/v1/users/${cleanTag}/followers`;
+      const response = await fetch(isFollowing ? `${url}/me` : url, {
+        method: isFollowing ? "DELETE" : "POST",
+        headers: {
+          "Authorization": `Bearer ${token}`,
+          "Content-Type": "application/json"
+        }
+      });
+      if (response.ok) {
+        setFollowedTags((prev) => isFollowing ? prev.filter((t) => t !== cleanTag) : [...prev, cleanTag]);
       }
-    } else {
-      targetTag = identifier as string;
+    } catch (err) {
+      console.error("Error al seguir:", err);
     }
-
-    if (!targetTag) return;
-
-    setFollowedTags((prev) =>
-      prev.includes(targetTag) ? prev.filter((t) => t !== targetTag) : [...prev, targetTag]
-    );
   }
 
-  function handleSearchTrend(hashtag: string) {
-    setSearchQuery(hashtag); 
-    setPage("search");       
-  }
-
-  const handleAddComment = (postId: string | number, text: string) => {
-    const newComment = {
-      id: Date.now().toString(),
-      name: "Ana Ruiz",
-      tag: "@anarz",
-      avatar: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?q=80&w=400",
-      text: text,
-      likes: 0,
-      liked: false,
-      time: "Ahora mismo",
-    };
-
-    setPosts((prevPosts) =>
-      prevPosts.map((post) => {
-        if (post.id === postId) {
-          return {
-            ...post,
-            comments: post.comments + 1,
-            commentsData: [newComment, ...(post.commentsData || [])],
-          };
-        }
-        return post;
-      })
-    );
-
-    if (selectedPost && selectedPost.id === postId) {
-      setSelectedPost({
-        ...selectedPost,
-        comments: selectedPost.comments + 1,
-        commentsData: [newComment, ...(selectedPost.commentsData || [])],
+  const handleAddComment = async (postId: string, text: string) => {
+    const token = localStorage.getItem("token");
+    if (!token) return;
+    try {
+      await fetch(`http://localhost:8080/v1/posts/${postId}/comments`, {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${token}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ text })
       });
+      
+      // Actualizamos el contador localmente
+      setPosts((prev) =>
+        prev.map((post) =>
+          post.post_id === postId ? { ...post, comment_count: (post.comment_count || 0) + 1 } : post
+        )
+      );
+    } catch (err) {
+      console.error("Error al comentar:", err);
     }
   };
 
-  const handleDeleteComment = (postId: string | number, commentId: string | number) => {
-    setPosts((prevPosts) =>
-      prevPosts.map((post) => {
-        if (post.id === postId) {
-          return {
-            ...post,
-            comments: Math.max(0, post.comments - 1),
-            commentsData: (post.commentsData || []).filter((c) => c.id !== commentId),
-          };
-        }
-        return post;
-      })
-    );
+  
 
-    if (selectedPost && selectedPost.id === postId) {
-      setSelectedPost({
-        ...selectedPost,
-        comments: Math.max(0, selectedPost.comments - 1),
-        commentsData: (selectedPost.commentsData || []).filter((c) => c.id !== commentId),
-      });
-    }
-  };
-
-  function handleDeletePost(postId: string | number) {
-    setPosts((prev) => prev.filter((post) => post.id !== postId));
+  async function handleDeletePost(postId: string) {
+    
+    setPosts((prev) => prev.filter((post) => post.post_id !== postId));
     setSelectedPost(null);
+    console.log("Post borrado visualmente (modo demo)");
   }
 
-  function handleEditPost(postId: string | number, newText: string) {
-    setPosts((prev) =>
-      prev.map((post) => {
-        if (post.id === postId) {
-          return {
-            ...post,
-            text: newText,
-          };
-        }
-        return post;
-      })
-    );
-
-    if (selectedPost && selectedPost.id === postId) {
-      setSelectedPost({
-        ...selectedPost,
-        text: newText,
-      });
-    }
+  function handleEditPost(postId: string, newText: string) {
+    setPosts((prev) => prev.map((post) => post.post_id === postId ? { ...post, text: newText } : post));
   }
 
-  if (!loggedIn) {
-    return <Login />;
-  }
+  if (isLoading) return <div className="min-h-screen bg-[#f5efe6] flex items-center justify-center font-bold text-gray-400">Iniciando T-Talk...</div>;
+  if (!isLoggedIn) return <Signup />;
 
-  const basePostsWithState = posts.map((post) => ({
-    ...post,
-    following: followedTags.includes(post.tag),
-  }));
-
-  const rightPanelUsers = [
-    { id: 10, name: "Sophia Bennett", tag: "@sophia", avatar: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?q=80&w=400" },
-    { id: 11, name: "Daniel Lee", tag: "@danlee", avatar: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?q=80&w=400" },
-    { id: 12, name: "Daniel Lee", tag: "@daniel", avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=400" },
-  ];
-
-  const ghostPosts: Post[] = rightPanelUsers
-    .filter((user) => followedTags.includes(user.tag) && !posts.some((p) => p.tag === user.tag))
-    .map((user) => ({
-      id: user.id + 5000,
-      name: user.name,
-      tag: user.tag,
-      avatar: user.avatar,
-      text: `¡Hola! Soy ${user.name} (${user.tag}). Gracias por seguirme`,
-      likes: 0,
-      comments: 0,
+  const mapToPost = (p: BackendPost): Post => {
+    const rawTag = p.user_tag || "usuario";
+    const cleanTag = rawTag.startsWith("@") ? rawTag : `@${rawTag}`;
+    return {
+      id: p.post_id,
+      name: p.user_name || "Usuario",
+      tag: cleanTag,
+      avatar: p.user_profile_pic_url || "https://images.unsplash.com/photo-1494790108377-be9c29b29330?q=80&w=400",
+      text: p.text,
+      time: new Date(p.created_at).toLocaleDateString(),
+      likes: p.like_count,
+      comments: p.comment_count || 0,
       liked: false,
-      following: true,
-      isOwnPost: false,
-      saved: false,
-      time: "Ahora mismo", 
-      commentsData: []     
-    } as Post)); 
-  const finalPostsForApp = [...ghostPosts, ...basePostsWithState];
+      following: followedTags.includes(rawTag.replace("@", "")),
+      isOwnPost: rawTag.replace("@", "") === (localStorage.getItem("user_tag") || "").replace("@", ""),
+      location: "Monterrey, MX",
+      commentsData: [],
+      image: p.media_urls && p.media_urls.length > 0 ? p.media_urls[0] : undefined
+    };
+  };
 
-  const legacyFollowedUserIds = rightPanelUsers
-    .filter((u) => followedTags.includes(u.tag))
-    .map((u) => u.id);
+  // Ordenamos los posts: tomamos la fecha 'created_at' y comparamos
+  const sortedPosts = [...posts].sort((a, b) => {
+    return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+  });
+
+  // Ahora usamos sortedPosts en lugar de posts para mapear
+  const legacyMappedPosts: Post[] = sortedPosts.map(mapToPost);
 
   function renderPage() {
     switch (page) {
       case "search":
         return (
           <SearchPage
-            posts={finalPostsForApp}
-            onOpenPost={(post) => setSelectedPost(post)}
-            onLikePost={handleToggleLike}
-            onFollowPost={(id) => {
-              const matched = finalPostsForApp.find((p) => p.id === id);
-              if (matched) handleToggleFollow(matched.tag);
-            }}
-            onDeletePost={handleDeletePost}
-            onEditPost={handleEditPost}
+            posts={legacyMappedPosts}
+            onOpenPost={(post: any) => setSelectedPost(posts.find(p => p.post_id === String(post.id)) || null)}
+            onLikePost={(id: any) => handleToggleLike(String(id))}
+            onFollowPost={(tag: any) => handleToggleFollow(String(tag))}
+            onDeletePost={(id: any) => handleDeletePost(String(id))}
+            onEditPost={(id: any, txt: string) => handleEditPost(String(id), txt)}
             initialQuery={searchQuery}
           />
         );
@@ -229,30 +208,24 @@ export default function App() {
       case "profile":
         return (
           <ProfilePage
-            posts={finalPostsForApp}
-            onOpenPost={(post) => setSelectedPost(post)}
-            onLikePost={handleToggleLike}
-            onFollowPost={(id) => {
-              const matched = finalPostsForApp.find((p) => p.id === id);
-              if (matched) handleToggleFollow(matched.tag);
-            }}
-            onDeletePost={handleDeletePost}
-            onEditPost={handleEditPost}
+            posts={legacyMappedPosts}
+            onOpenPost={(post: any) => setSelectedPost(posts.find(p => p.post_id === String(post.id)) || null)}
+            onLikePost={(id: any) => handleToggleLike(String(id))}
+            onFollowPost={(tag: any) => handleToggleFollow(String(tag))}
+            onDeletePost={(id: any) => handleDeletePost(String(id))}
+            onEditPost={(id: any, txt: string) => handleEditPost(String(id), txt)}
           />
         );
 
       case "following":
         return (
           <FollowingPage
-            posts={finalPostsForApp}
-            onOpenPost={(post) => setSelectedPost(post)}
-            onLikePost={handleToggleLike}
-            onFollowPost={(id) => {
-              const matched = finalPostsForApp.find((p) => p.id === id);
-              if (matched) handleToggleFollow(matched.tag);
-            }}
-            onDeletePost={handleDeletePost}
-            onEditPost={handleEditPost}
+            posts={legacyMappedPosts}
+            onOpenPost={(post: any) => setSelectedPost(posts.find(p => p.post_id === String(post.id)) || null)}
+            onLikePost={(id: any) => handleToggleLike(String(id))}
+            onFollowPost={(tag: any) => handleToggleFollow(String(tag))}
+            onDeletePost={(id: any) => handleDeletePost(String(id))}
+            onEditPost={(id: any, txt: string) => handleEditPost(String(id), txt)}
           />
         );
 
@@ -264,15 +237,15 @@ export default function App() {
           <>
             <CreatePost onAddPost={handleAddPost} />
             <div className="space-y-4 mt-4">
-              {basePostsWithState.map((post) => (
+              {legacyMappedPosts.map((post) => (
                 <PostCard
                   key={post.id}
                   post={post}
-                  onOpen={() => setSelectedPost(post)}
-                  onLike={() => handleToggleLike(post.id)}
-                  onFollow={() => handleToggleFollow(post.tag)}
-                  onDelete={() => handleDeletePost(post.id)}
-                  onEdit={(newText) => handleEditPost(post.id, newText)}
+                  onOpen={() => setSelectedPost(posts.find(p => p.post_id === post.id) || null)}
+                  onLike={(id: string) => handleToggleLike(id)}
+                  onFollow={(tag: string) => handleToggleFollow(tag)}
+                  onDelete={(id: string) => handleDeletePost(id)}
+                  onEdit={(id: string, newText: string) => handleEditPost(id, newText)} 
                 />
               ))}
             </div>
@@ -284,51 +257,29 @@ export default function App() {
   return (
     <div className="min-h-screen text-gray-800 bg-gradient-to-br from-gray-50 via-gray-100 to-zinc-200/70 attachment-fixed font-sans antialiased">
       <div className="max-w-[1400px] mx-auto grid lg:grid-cols-[260px_1fr_360px] gap-6 px-4 lg:px-6">
-        
-        <div className="hidden lg:block sticky top-0 h-screen py-6">
-          <Sidebar page={page} setPage={handlePageChange} />
-        </div>
-
+        <div className="hidden lg:block sticky top-0 h-screen py-6"><Sidebar page={page} setPage={handlePageChange} /></div>
         <main className="py-6 pb-32 lg:pb-6">
           <div className="bg-white/30 backdrop-blur-3xl border border-white/40 rounded-[32px] overflow-hidden shadow-xl min-h-[85vh]">
-            
             <div className="sticky top-0 z-40 backdrop-blur-xl bg-white/50 border-b border-gray-200/20 px-6 py-5 flex items-center justify-between">
-              <h1 className="text-2xl font-black tracking-tight text-gray-900 capitalize">
-                {page === "home" ? "Inicio" : page}
-              </h1>
+              <h1 className="text-2xl font-black tracking-tight text-gray-900 capitalize">{page === "home" ? "Inicio" : page}</h1>
             </div>
-
             <div className="p-4 lg:p-6">{renderPage()}</div>
           </div>
         </main>
-
         <div className="hidden lg:block sticky top-0 h-screen py-6 overflow-y-auto no-scrollbar">
-          <RightPanel 
-            onSearchTrend={handleSearchTrend}
-            onFollowSuggestion={(id) => {
-              const user = rightPanelUsers.find((u) => u.id === id);
-              if (user) handleToggleFollow(user.tag);
-            }}
-            followedUserIds={legacyFollowedUserIds} 
-          />
+          <RightPanel onSearchTrend={(hashtag) => { setSearchQuery(hashtag); setPage("search"); }} onFollowSuggestion={(tag) => handleToggleFollow(tag.toString())} followedUserIds={followedTags as any} />
         </div>
       </div>
-
       <BottomBar page={page} setPage={handlePageChange} />
-
       <PostModal
-        post={selectedPost ? { ...selectedPost, following: followedTags.includes(selectedPost.tag) } : null}
+        post={selectedPost ? mapToPost(selectedPost) : null}
         onClose={() => setSelectedPost(null)}
-        onLike={handleToggleLike}
-        onFollow={() => selectedPost && handleToggleFollow(selectedPost.tag)}
-        onAddComment={handleAddComment}
-        onDeleteComment={handleDeleteComment}
-        onEdit={handleEditPost}
-        onDelete={() => {
-          if (!selectedPost) return;
-          handleDeletePost(selectedPost.id);
-          setSelectedPost(null);
-        }}
+        onLike={(id) => handleToggleLike(id)}
+        onFollow={() => selectedPost && handleToggleFollow(selectedPost.user_tag)}
+        onAddComment={(id, txt) => handleAddComment(id, txt)}
+        onDeleteComment={() => {}}
+        onEdit={(id, txt) => handleEditPost(id, txt)}
+        onDelete={() => selectedPost && handleDeletePost(selectedPost.post_id)}
       />
     </div>
   );

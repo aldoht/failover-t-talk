@@ -7,7 +7,6 @@ export default function Signup() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   
-
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
@@ -21,7 +20,6 @@ export default function Signup() {
       return;
     }
 
- 
     const formattedTag = tag.startsWith("@") ? tag.slice(1).trim() : tag.trim();
 
     setIsLoading(true);
@@ -48,7 +46,13 @@ export default function Signup() {
       const data = await response.json();
       console.log("¡Usuario guardado en AWS con éxito!", data);
       
-      window.location.href = "/login";
+      if (data.token) {
+        localStorage.setItem("token", data.token);
+        localStorage.setItem("user_tag", formattedTag); // Ej: "anarz"
+        localStorage.setItem("user_name", name.trim());  // Ej: "Ana Ruiz"
+      }
+
+     window.location.href = "/";
 
     } catch (err: any) {
       console.error("Error en el registro:", err);

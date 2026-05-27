@@ -1,90 +1,137 @@
-import { useRef, useState } from "react";
+import { useRef, useState, useEffect } from "react";
 import { Image, Video, X, Link2 } from "lucide-react";
-import { currentUser, type Post } from "../services/api";
 
 type Props = {
-  onAddPost: (post: Post) => void;
+  onAddPost: (post: any) => void;
 };
 
 export default function CreatePost({ onAddPost }: Props) {
   const [text, setText] = useState("");
-  const [imageUrl, setImageUrl] = useState("");
-  const [videoUrl, setVideoUrl] = useState("");
-  const [showUrlInputs, setShowUrlInputs] = useState(false);
-  const [previewImage, setPreviewImage] = useState("");
-  const [previewVideo, setPreviewVideo] = useState("");
+  const [mediaUrl, setMediaUrl] = useState(""); 
+  const [showUrlInput, setShowUrlInput] = useState(false);
+  const [previewMedia, setPreviewMedia] = useState("");
+  const [mediaType, setMediaType] = useState<"image" | "video" | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+
+  // 🌟 Estado dinámico para el usuario loggeado (Se inicializa vacío)
+  const [myUserData, setMyUserData] = useState({
+    name: "Cargando...",
+    tag: "...",
+    avatar: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?q=80&w=400"
+  });
+
+  // 👤 Cargar los datos reales guardados en el almacenamiento al iniciar sesión
+  useEffect(() => {
+    const savedName = localStorage.getItem("user_name");
+    const savedTag = localStorage.getItem("user_tag");
+    const savedAvatar = localStorage.getItem("user_profile_picture_url");
+
+    if (savedName || savedTag) {
+      setMyUserData({
+        name: savedName || "Usuario de T-Talk",
+        tag: savedTag || "usuario",
+        avatar: savedAvatar || "https://images.unsplash.com/photo-1494790108377-be9c29b29330?q=80&w=400"
+      });
+    }
+  }, []);
 
   const imageInputRef = useRef<HTMLInputElement>(null);
   const videoInputRef = useRef<HTMLInputElement>(null);
 
   const MAX_CHARS = 280;
-  const isPostEmpty = !text.trim() && !previewImage && !previewVideo && !imageUrl && !videoUrl;
+  const isPostEmpty = !text.trim() && !previewMedia && !mediaUrl;
 
-  function handleCreatePost() {
-    if (isPostEmpty) return;
+  async function handleCreatePost() {
+    if (isPostEmpty || isLoading) return;
 
-    const newPost: Post = {
-      id: Date.now(),
-      name: currentUser.name,
-      tag: currentUser.tag,
-      avatar: currentUser.avatar,
-      text,
-      image: previewImage || imageUrl,
-      video: previewVideo || videoUrl,
-      likes: 0,
-      comments: 0,
-      liked: false,
-      following: false,
-      time: "Ahora", 
-      location: currentUser.location,
-      isOwnPost: true,
-      commentsData: []
-    };
+    const token = localStorage.getItem("token");
+    if (!token) {
+      alert("No hay una sesión activa. Por favor, inicia sesión de nuevo.");
+      return;
+    }
 
-    onAddPost(newPost);
-    
-    setText("");
-    setImageUrl("");
-    setVideoUrl("");
-    setPreviewImage("");
-    setPreviewVideo("");
-    setShowUrlInputs(false);
+    setIsLoading(true);
+
+    try {
+      // 🔒 Petición real al backend: POST /v1/posts
+      const response = await fetch("http://localhost:8080/v1/posts", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          text: text.trim(),
+          url: previewMedia || mediaUrl || null, // Se envía la foto o el video unificado en "url"
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("No se pudo publicar en el servidor");
+      }
+
+      // Estructuramos la respuesta local para meterla al feed principal de App.tsx
+      onAddPost({
+        text: text.trim(),
+        media_urls: previewMedia || mediaUrl ? [previewMedia || mediaUrl] : [],
+      });
+      
+      // Limpieza de estados
+      setText("");
+      setMediaUrl("");
+      setPreviewMedia("");
+      setMediaType(null);
+      setShowUrlInput(false);
+
+    } catch (err) {
+      console.error("Error al crear el post en AWS:", err);
+      alert("Hubo un error al publicar tu post. Inténtalo de nuevo.");
+    } finally {
+      setIsLoading(false);
+    }
   }
 
+  // Manejo de carga de imágenes
   function handleImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
-    const image = URL.createObjectURL(file);
-    setPreviewImage(image);
-    setImageUrl("");
+    const url = URL.createObjectURL(file);
+    setPreviewMedia(url);
+    setMediaType("image");
+    setMediaUrl(""); 
   }
 
+  // Manejo de carga de videos
   function handleVideoUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
-    const video = URL.createObjectURL(file);
-    setPreviewVideo(video);
-    setVideoUrl(""); 
+    const url = URL.createObjectURL(file);
+    setPreviewMedia(url);
+    setMediaType("video");
+    setMediaUrl(""); 
+  }
+
+  function handleRemoveMedia() {
+    setPreviewMedia("");
+    setMediaType(null);
   }
 
   return (
     <div className="bg-white/80 backdrop-blur-2xl border border-white/40 rounded-[32px] p-6 shadow-sm transition-all duration-300">
       <div className="flex gap-4 items-start">
-        {/* foto del usuario */}
         <img
-          src={currentUser.avatar}
-          alt={currentUser.name}
+          src={myUserData.avatar}
+          alt={myUserData.name}
           className="w-11 h-11 rounded-full object-cover shadow-inner shrink-0 mt-1"
         />
 
         <div className="flex-1 min-w-0">
-          {/* info usuario */}
+          {/* 🧑‍💻 Renderizado dinámico del usuario loggeado */}
           <div className="mb-2">
-            <p className="font-bold text-gray-900 text-sm leading-tight">{currentUser.name}</p>
-            <p className="text-xs text-gray-400 font-medium mt-0.5">{currentUser.location}</p>
+            <p className="font-bold text-gray-900 text-sm leading-tight">{myUserData.name}</p>
+            <p className="text-xs text-gray-400 font-medium mt-0.5">@{myUserData.tag}</p>
           </div>
 
-          {/* área de texto */}
           <textarea
             value={text}
             onChange={(e) => {
@@ -95,14 +142,21 @@ export default function CreatePost({ onAddPost }: Props) {
             placeholder="¿Qué está pasando?"
             className="w-full bg-transparent text-gray-800 placeholder:text-gray-400 text-[16px] leading-relaxed outline-none resize-none pt-1"
             rows={3}
+            disabled={isLoading}
           />
 
-          {/* preview imagen subida */}
-          {previewImage && (
-            <div className="relative mt-3 rounded-2xl overflow-hidden border border-gray-100 shadow-sm max-h-[350px]">
-              <img src={previewImage} alt="Preview" className="w-full h-full object-cover" />
+          {/* Renderizado Condicional del Preview de Multimedia */}
+          {previewMedia && (
+            <div className="relative mt-3 rounded-2xl overflow-hidden border border-gray-100 shadow-sm max-h-[350px] bg-black/5">
+              {mediaType === "image" ? (
+                <img src={previewMedia} alt="Preview" className="w-full h-full object-cover" />
+              ) : (
+                <video controls className="w-full max-h-[350px] object-cover">
+                  <source src={previewMedia} />
+                </video>
+              )}
               <button
-                onClick={() => setPreviewImage("")}
+                onClick={handleRemoveMedia}
                 className="absolute top-2 right-2 bg-black/60 hover:bg-black/80 text-white p-1.5 rounded-full backdrop-blur-sm transition-colors"
               >
                 <X size={14} />
@@ -110,45 +164,26 @@ export default function CreatePost({ onAddPost }: Props) {
             </div>
           )}
 
-          {/* preview video subido */}
-          {previewVideo && (
-            <div className="relative mt-3 rounded-2xl overflow-hidden border border-gray-100 shadow-sm bg-black/5">
-              <video controls className="w-full max-h-[350px] object-cover">
-                <source src={previewVideo} />
-              </video>
-              <button
-                onClick={() => setPreviewVideo("")}
-                className="absolute top-2 right-2 bg-black/60 hover:bg-black/80 text-white p-1.5 rounded-full backdrop-blur-sm transition-colors"
-              >
-                <X size={14} />
-              </button>
-            </div>
-          )}
-
-          {/* para que ponga una url */}
-          {showUrlInputs && (
+          {showUrlInput && (
             <div className="mt-4 p-4 bg-gray-50/50 rounded-2xl border border-gray-100 space-y-3 animate-fade-in">
               <input
-                value={imageUrl}
+                value={mediaUrl}
                 onChange={(e) => {
-                  setImageUrl(e.target.value);
-                  if (e.target.value) setPreviewImage(""); 
+                  setMediaUrl(e.target.value);
+                  if (e.target.value) {
+                    setPreviewMedia("");
+                    // Detecta de forma simple si la URL es de video o imagen
+                    setMediaType(e.target.value.match(/\.(mp4|webm|ogg)/i) ? "video" : "image");
+                  }
                 }}
-                placeholder="Pegar URL de Imagen (http://...)"
+                placeholder="Pegar URL de foto o video (http://...)"
                 className="w-full bg-white border border-gray-200 px-3 py-2 text-xs rounded-xl outline-none focus:border-gray-300 text-gray-700 transition"
-              />
-              <input
-                value={videoUrl}
-                onChange={(e) => {
-                  setVideoUrl(e.target.value);
-                  if (e.target.value) setPreviewVideo(""); 
-                }}
-                placeholder="Pegar URL de Video (http://...)"
-                className="w-full bg-white border border-gray-200 px-3 py-2 text-xs rounded-xl outline-none focus:border-gray-300 text-gray-700 transition"
+                disabled={isLoading}
               />
             </div>
           )}
 
+          {/* Inputs ocultos para lanzar el explorador de archivos */}
           <input
             ref={imageInputRef}
             type="file"
@@ -164,14 +199,13 @@ export default function CreatePost({ onAddPost }: Props) {
             onChange={handleVideoUpload}
           />
 
-         
           <div className="border-t border-gray-100 mt-4 pt-3 flex items-center justify-between">
-           
             <div className="flex items-center gap-1">
               <button
                 onClick={() => imageInputRef.current?.click()}
                 className="p-2 rounded-full text-gray-400 hover:text-gray-900 hover:bg-gray-100/70 transition-colors"
                 title="Subir Imagen desde dispositivo"
+                disabled={isLoading}
               >
                 <Image size={18} strokeWidth={2.2} />
               </button>
@@ -180,20 +214,21 @@ export default function CreatePost({ onAddPost }: Props) {
                 onClick={() => videoInputRef.current?.click()}
                 className="p-2 rounded-full text-gray-400 hover:text-gray-900 hover:bg-gray-100/70 transition-colors"
                 title="Subir Video desde dispositivo"
+                disabled={isLoading}
               >
                 <Video size={18} strokeWidth={2.2} />
               </button>
 
               <button
-                onClick={() => setShowUrlInputs(!showUrlInputs)}
-                className={`p-2 rounded-full transition-colors ${showUrlInputs ? "text-gray-900 bg-gray-100" : "text-gray-400 hover:text-gray-900 hover:bg-gray-100/70"}`}
-                title="Insertar enlaces de red"
+                onClick={() => setShowUrlInput(!showUrlInput)}
+                className={`p-2 rounded-full transition-colors ${showUrlInput ? "text-gray-900 bg-gray-100" : "text-gray-400 hover:text-gray-900 hover:bg-gray-100/70"}`}
+                title="Insertar enlace multimedia"
+                disabled={isLoading}
               >
                 <Link2 size={18} strokeWidth={2.2} />
               </button>
             </div>
 
-            {/* contador de largo de texto*/}
             <div className="flex items-center gap-4">
               {text.length > 0 && (
                 <span
@@ -207,7 +242,7 @@ export default function CreatePost({ onAddPost }: Props) {
 
               <button
                 onClick={handleCreatePost}
-                disabled={isPostEmpty}
+                disabled={isPostEmpty || isLoading}
                 className={`
                   px-5
                   py-2
@@ -218,13 +253,13 @@ export default function CreatePost({ onAddPost }: Props) {
                   duration-200
                   shadow-sm
                   ${
-                    isPostEmpty
+                    isPostEmpty || isLoading
                       ? "bg-[#d6bfa7]/40 text-[#a38d77] cursor-not-allowed shadow-none"
                       : "bg-[#d6bfa7] hover:bg-[#c9ae91] text-gray-900 hover:shadow active:scale-95"
                   }
                 `}
               >
-                Publicar
+                {isLoading ? "Publicando..." : "Publicar"}
               </button>
             </div>
           </div>

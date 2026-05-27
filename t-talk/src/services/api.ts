@@ -1,5 +1,5 @@
 export type CommentType = {
-  id: string | number;
+  id: string;
   name: string;
   tag: string;
   avatar: string;
@@ -10,7 +10,7 @@ export type CommentType = {
 };
 
 export type Post = {
-  id: string | number;
+  id: string;
   name: string;
   tag: string;
   avatar: string;
@@ -27,17 +27,17 @@ export type Post = {
   saved?: boolean;
   reposts?: number;
   views?: string;
-  commentsData?: CommentType[];
+  commentsData: CommentType[];
 };
 
 export const currentUser = {
-  name: "Ana Ruiz",
-  tag: "anarz",
+  name: localStorage.getItem("user_name") || "Ana Ruiz",
+  tag: localStorage.getItem("user_tag") || "anarz",
   avatar: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?q=80&w=400",
   location: "Monterrey, MX",
 };
 
-const USE_MOCK = true;
+const USE_MOCK = false;
 const API_URL = "http://localhost:8080/v1";
 
 interface BackendPost {
@@ -78,8 +78,8 @@ function mapBackendPostToFrontend(bp: BackendPost): Post {
     following: false,
     image: bp.media_urls?.[0] || undefined, 
     time: new Date(bp.created_at).toLocaleDateString(), 
-    location: "Desconocida", 
-    isOwnPost: bp.user_tag === currentUser.tag,
+    location: "Monterrey", 
+    isOwnPost: bp.user_tag === localStorage.getItem("user_tag"),
     reposts: 0,
     views: "0",
     commentsData: []
@@ -113,143 +113,66 @@ export async function login(body: any) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
-
-  if (!response.ok) {
-    const errorText = await response.text().catch(() => "Error de autenticación");
-    throw new Error(errorText);
-  }
-
+  if (!response.ok) throw new Error("Credenciales inválidas");
   const res = await response.json();
   localStorage.setItem("token", res.token);
   return res;
 }
 
-export async function signup(body: any) {
-  const response = await fetch(`${API_URL}/auth/signup`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text().catch(() => "Error al registrarse");
-    throw new Error(errorText);
-  }
-
-  const res = await response.json();
-  localStorage.setItem("token", res.token);
-  return res;
-}
-
-export async function getPosts(): Promise<Post[]> {
-  if (USE_MOCK) {
-    return [];
-  }
-
-  const response = await fetch(`${API_URL}/users/${currentUser.tag}/posts`, {
-    headers: getAuthHeaders()
-  });
-  
-  if (!response.ok) return [];
-  const data: BackendPost[] = await response.json();
-  return data.map(mapBackendPostToFrontend);
-}
-
-export async function createPost(data: Partial<Post>) {
-  if (USE_MOCK) {
-    return data;
-  }
-
+export async function createPost(data: { text: string; media_urls?: string[] }) {
   const response = await fetch(`${API_URL}/posts`, {
     method: "POST",
     headers: getAuthHeaders(),
     body: JSON.stringify({
       text: data.text,
-      url: data.image || "" 
+      media_urls: data.media_urls || []
     }),
   });
-
   return response.ok;
 }
 
-export async function likePost(id: string | number) {
-  if (USE_MOCK) {
-    return true;
-  }
-
+export async function likePost(id: string) {
   const response = await fetch(`${API_URL}/posts/${id}/likes`, {
     method: "POST",
     headers: getAuthHeaders()
   });
-
   return response.ok;
 }
 
-export async function unlikePost(id: string | number) {
-  if (USE_MOCK) {
-    return true;
-  }
-
-  const response = await fetch(`${API_URL}/posts/${id}/likes/me`, {
-    method: "DELETE",
-    headers: getAuthHeaders()
-  });
-
-  return response.ok;
-}
-
-export async function commentPost(id: string | number, text: string) {
-  if (USE_MOCK) {
-    return { success: true, text };
-  }
-
-  const response = await fetch(`${API_URL}/posts/${id}/comments`, {
-    method: "POST",
-    headers: getAuthHeaders(),
-    body: JSON.stringify({
-      text: text,
-      url: ""
-    }),
-  });
-
-  return response.ok;
-}
-
-export async function followUser(tag: string) {
-  if (USE_MOCK) {
-    return true;
-  }
-
-  const cleanTag = tag.replace("@", "");
-  const response = await fetch(`${API_URL}/users/${cleanTag}/followers`, {
-    method: "POST",
-    headers: getAuthHeaders()
-  });
-
-  return response.ok;
-}
-
-export async function deletePost(id: string | number) {
-  if (USE_MOCK) {
-    return true;
-  }
+export async function deletePost(id: string) {
   const response = await fetch(`${API_URL}/posts/${id}`, {
     method: "DELETE",
     headers: getAuthHeaders()
   });
-
   return response.ok;
 }
 
-export async function editPost(id: string | number, text: string) {
-  if (USE_MOCK) {
-    return { success: true, text };
-  }
+export async function editPost(id: string, text: string) {
   const response = await fetch(`${API_URL}/posts/${id}`, {
     method: "PUT",
     headers: getAuthHeaders(),
     body: JSON.stringify({ text }),
   });
-
   return response.json();
+}
+
+// NUEVA FUNCIÓN AÑADIDA: Para obtener los comentarios del backend
+// services/api.ts
+export async function getComments(postId: string) {
+  const token = localStorage.getItem("token");
+  try {
+    const response = await fetch(`http://localhost:8080/v1/posts/${postId}/comments`, {
+      headers: {
+        "Authorization": `Bearer ${token}`,
+      }
+    });
+    
+    if (!response.ok) return []; // Si falla, devolvemos array vacío
+    
+    const data = await response.json();
+    return data; // Esto debería ser el array de comentarios
+  } catch (error) {
+    console.error("Error al obtener comentarios:", error);
+    return [];
+  }
 }

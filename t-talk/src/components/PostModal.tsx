@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import type { Post } from "../services/api";
+import { getComments } from "../services/api";
 import {
   Heart,
   MessageCircle,
@@ -16,11 +17,11 @@ import {
 type Props = {
   post: Post | null;
   onClose: () => void;
-  onLike: (id: number) => void;
-  onFollow: (id: number) => void;
-  onAddComment: (postId: number, text: string) => void;
-  onDeleteComment: (postId: number, commentId: number) => void; 
-  onEdit: (postId: number, text: string) => void;
+  onLike: (id: string) => void;
+  onFollow: (id: string) => void;
+  onAddComment: (postId: string, text: string) => void;
+  onDeleteComment: (postId: string, commentId: string) => void;
+  onEdit: (postId: string, text: string) => void;
   onDelete: () => void;
 };
 
@@ -37,11 +38,15 @@ export default function PostModal({
   const [editing, setEditing] = useState(false);
   const [editedText, setEditedText] = useState("");
   const [comment, setComment] = useState("");
+  const [liveComments, setLiveComments] = useState<any[]>([]);
 
   useEffect(() => {
     if (post) {
       document.body.style.overflow = "hidden";
       setEditedText(post.text);
+      getComments(post.id).then(data => {
+        setLiveComments(data);
+      });
     }
 
     return () => {
@@ -57,11 +62,25 @@ export default function PostModal({
     setEditing(false);
   }
 
-  function handleSubmitComment() {
-    if (!comment.trim()) return;
+  async function handleSubmitComment() {
+    if (!comment.trim() || !post) return;
 
-    onAddComment(post.id, comment);
+    const textoComentario = comment;
     setComment("");
+
+    const nuevoComentarioLocal = {
+      id: Date.now().toString(),
+      name: localStorage.getItem("user_name") || "Usuario",
+      tag: `@${(localStorage.getItem("user_tag") || "usuario").replace("@", "")}`,
+      avatar: localStorage.getItem("user_profile_picture_url") || "https://images.unsplash.com/photo-1494790108377-be9c29b29330?q=80&w=400",
+      text: textoComentario,
+      likes: 0,
+      liked: false,
+      time: "Justo ahora"
+    };
+
+    setLiveComments((prev) => [...prev, nuevoComentarioLocal]);
+    await onAddComment(post.id, textoComentario);
   }
 
   return (
@@ -73,7 +92,6 @@ export default function PostModal({
         onClick={(e) => e.stopPropagation()}
         className="relative w-full max-w-2xl bg-white/90 backdrop-blur-2xl border border-white/40 rounded-[32px] shadow-2xl h-[85vh] flex flex-col overflow-hidden animate-fade-in"
       >
-        {/* encabezado fijo */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 bg-white/40 backdrop-blur-sm sticky top-0 z-10">
           <h3 className="font-bold text-gray-900 text-sm tracking-wide uppercase">Publicación</h3>
           <button
@@ -85,21 +103,20 @@ export default function PostModal({
         </div>
 
         <div className="flex-1 overflow-y-auto p-6 lg:p-8 space-y-6 no-scrollbar">
-          {/* encabezado perfil publicación */}
           <div className="flex items-start justify-between gap-4">
             <div className="flex gap-3">
               <img src={post.avatar} alt={post.name} className="w-12 h-12 rounded-full object-cover shadow-inner" />
               <div>
                 <h2 className="font-bold text-gray-900 text-[16px] leading-tight">{post.name}</h2>
                 <p className="text-gray-400 text-xs mt-0.5">{post.tag}</p>
-                <div className="flex items-center gap-3 text-xs font-medium text-gray-400 mt-1.5 flex-wrap">
+                <div className="flex items-center gap-3 text-xs font-medium text-gray-400 mt-1.5">
                   <div className="flex items-center gap-1">
                     <Clock3 size={12} />
                     <span>{post.time}</span>
                   </div>
                   <div className="flex items-center gap-1">
                     <MapPin size={12} />
-                    <span>{post.location || "Monterrey"}</span>
+                    <span>{post.location}</span>
                   </div>
                 </div>
               </div>
@@ -128,7 +145,7 @@ export default function PostModal({
                   {editing ? "Guardar" : "Editar"}
                 </button>
                 <button
-                  onClick={onDelete}
+                  
                   className="px-3.5 py-1.5 rounded-full text-xs font-semibold bg-red-50 text-red-600 hover:bg-red-100 transition flex items-center gap-1"
                 >
                   <Trash2 size={13} />
@@ -149,14 +166,12 @@ export default function PostModal({
             <p className="text-[17px] leading-relaxed text-gray-800 whitespace-pre-wrap break-words">{post.text}</p>
           )}
 
-          {/* imagenes */}
           {post.image && !editing && (
             <div className="overflow-hidden rounded-2xl border border-gray-100 shadow-sm max-h-[450px]">
               <img src={post.image} alt="Contenido" className="w-full h-full object-cover" />
             </div>
           )}
 
-          {/* metricas */}
           <div className="flex items-center gap-6 border-y border-gray-200/30 py-3.5 text-gray-400">
             <button
               onClick={() => onLike(post.id)}
@@ -167,11 +182,10 @@ export default function PostModal({
             </button>
             <div className="flex items-center gap-1.5 text-xs font-semibold text-gray-400">
               <MessageCircle size={18} />
-              <span>{post.comments} Comentarios</span>
+              <span>{liveComments.length} Comentarios</span>
             </div>
           </div>
 
-          {/* textarea comentario */}
           <div className="bg-white/60 border border-gray-200/50 rounded-2xl p-3 shadow-inner">
             <textarea
               value={comment}
@@ -183,7 +197,8 @@ export default function PostModal({
             <div className="flex justify-end mt-2">
               <button
                 onClick={handleSubmitComment}
-                className="bg-gray-950 hover:bg-gray-800 text-white font-semibold text-xs px-4 py-2 rounded-full flex items-center gap-1.5 transition shadow-sm duration-150 active:scale-95"
+                disabled={!comment.trim()}
+                className="bg-gray-950 hover:bg-gray-800 disabled:opacity-50 text-white font-semibold text-xs px-4 py-2 rounded-full flex items-center gap-1.5 transition shadow-sm duration-150 active:scale-95"
               >
                 <Send size={12} />
                 <span>Responder</span>
@@ -192,41 +207,21 @@ export default function PostModal({
           </div>
 
           <div className="space-y-3 pt-2">
-            {post.commentsData?.map((c) => {
-              // validación: es comentario mío o soy el dueño del post entero?
-              const isCommentOwner = c.tag === "@anarz" || post.isOwnPost;
-
-              return (
-                <div key={c.id} className="bg-white/40 border border-gray-200/30 rounded-2xl p-4 transition-all">
-                  <div className="flex justify-between items-start gap-2">
-                    <div className="flex gap-3 min-w-0">
-                      <img src={c.avatar} alt={c.name} className="w-9 h-9 rounded-full object-cover shrink-0" />
-                      <div className="min-w-0">
-                        <div className="flex items-baseline gap-1.5 flex-wrap">
-                          <span className="font-bold text-gray-900 text-sm">{c.name}</span>
-                          <span className="text-gray-400 text-xs truncate">{c.tag}</span>
-                        </div>
-                        <span className="text-[11px] text-gray-400 block mt-0.5">{c.time}</span>
-                      </div>
+            {liveComments.map((c) => (
+              <div key={c.id} className="bg-white/40 border border-gray-200/30 rounded-2xl p-4">
+                <div className="flex justify-between items-start gap-2">
+                  <div className="flex gap-3 min-w-0">
+                    <img src={c.avatar || "https://images.unsplash.com/photo-1494790108377-be9c29b29330?q=80&w=400"} alt={c.name} className="w-9 h-9 rounded-full object-cover shrink-0" />
+                    <div>
+                      <div className="font-bold text-gray-900 text-sm">{c.name}</div>
+                      <div className="text-gray-400 text-xs">{c.tag}</div>
                     </div>
-
-                    {isCommentOwner && (
-                      <button
-                        onClick={() => onDeleteComment(post.id, c.id)}
-                        className="text-gray-400 hover:text-red-500 transition p-1 rounded-md"
-                        title="Eliminar comentario"
-                      >
-                        <Trash2 size={14} />
-                      </button>
-                    )}
                   </div>
-
-                  <p className="text-gray-700 text-[14px] leading-relaxed mt-2.5 pl-0.5 whitespace-pre-wrap break-words">
-                    {c.text}
-                  </p>
+                  
                 </div>
-              );
-            })}
+                <p className="text-gray-700 text-[14px] mt-2.5">{c.text}</p>
+              </div>
+            ))}
           </div>
         </div>
       </div>
