@@ -156,8 +156,7 @@ export async function editPost(id: string, text: string) {
   return response.json();
 }
 
-// NUEVA FUNCIÓN AÑADIDA: Para obtener los comentarios del backend
-// services/api.ts
+
 export async function getComments(postId: string) {
   const token = localStorage.getItem("token");
   try {
@@ -167,10 +166,9 @@ export async function getComments(postId: string) {
       }
     });
     
-    if (!response.ok) return []; // Si falla, devolvemos array vacío
-    
+    if (!response.ok) return []; 
     const data = await response.json();
-    return data; // Esto debería ser el array de comentarios
+    return data; 
   } catch (error) {
     console.error("Error al obtener comentarios:", error);
     return [];

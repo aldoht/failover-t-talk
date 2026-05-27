@@ -13,14 +13,14 @@ export default function CreatePost({ onAddPost }: Props) {
   const [mediaType, setMediaType] = useState<"image" | "video" | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
-  // 🌟 Estado dinámico para el usuario loggeado (Se inicializa vacío)
+
   const [myUserData, setMyUserData] = useState({
     name: "Cargando...",
     tag: "...",
     avatar: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?q=80&w=400"
   });
 
-  // 👤 Cargar los datos reales guardados en el almacenamiento al iniciar sesión
+  
   useEffect(() => {
     const savedName = localStorage.getItem("user_name");
     const savedTag = localStorage.getItem("user_tag");
@@ -53,7 +53,7 @@ export default function CreatePost({ onAddPost }: Props) {
     setIsLoading(true);
 
     try {
-      // 🔒 Petición real al backend: POST /v1/posts
+    
       const response = await fetch("http://localhost:8080/v1/posts", {
         method: "POST",
         headers: {
@@ -62,7 +62,7 @@ export default function CreatePost({ onAddPost }: Props) {
         },
         body: JSON.stringify({
           text: text.trim(),
-          url: previewMedia || mediaUrl || null, // Se envía la foto o el video unificado en "url"
+          url: previewMedia || mediaUrl || null, 
         }),
       });
 
@@ -70,13 +70,11 @@ export default function CreatePost({ onAddPost }: Props) {
         throw new Error("No se pudo publicar en el servidor");
       }
 
-      // Estructuramos la respuesta local para meterla al feed principal de App.tsx
       onAddPost({
         text: text.trim(),
         media_urls: previewMedia || mediaUrl ? [previewMedia || mediaUrl] : [],
       });
       
-      // Limpieza de estados
       setText("");
       setMediaUrl("");
       setPreviewMedia("");
@@ -91,7 +89,7 @@ export default function CreatePost({ onAddPost }: Props) {
     }
   }
 
-  // Manejo de carga de imágenes
+
   function handleImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -101,7 +99,7 @@ export default function CreatePost({ onAddPost }: Props) {
     setMediaUrl(""); 
   }
 
-  // Manejo de carga de videos
+  
   function handleVideoUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -126,7 +124,7 @@ export default function CreatePost({ onAddPost }: Props) {
         />
 
         <div className="flex-1 min-w-0">
-          {/* 🧑‍💻 Renderizado dinámico del usuario loggeado */}
+          
           <div className="mb-2">
             <p className="font-bold text-gray-900 text-sm leading-tight">{myUserData.name}</p>
             <p className="text-xs text-gray-400 font-medium mt-0.5">@{myUserData.tag}</p>
@@ -145,7 +143,6 @@ export default function CreatePost({ onAddPost }: Props) {
             disabled={isLoading}
           />
 
-          {/* Renderizado Condicional del Preview de Multimedia */}
           {previewMedia && (
             <div className="relative mt-3 rounded-2xl overflow-hidden border border-gray-100 shadow-sm max-h-[350px] bg-black/5">
               {mediaType === "image" ? (
@@ -172,7 +169,7 @@ export default function CreatePost({ onAddPost }: Props) {
                   setMediaUrl(e.target.value);
                   if (e.target.value) {
                     setPreviewMedia("");
-                    // Detecta de forma simple si la URL es de video o imagen
+                   
                     setMediaType(e.target.value.match(/\.(mp4|webm|ogg)/i) ? "video" : "image");
                   }
                 }}
@@ -183,7 +180,6 @@ export default function CreatePost({ onAddPost }: Props) {
             </div>
           )}
 
-          {/* Inputs ocultos para lanzar el explorador de archivos */}
           <input
             ref={imageInputRef}
             type="file"

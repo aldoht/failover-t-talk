@@ -13,6 +13,7 @@ import NotificationsPage from "./pages/NotificationPage";
 
 import type { Post } from "./services/api";
 
+
 export interface BackendPost {
   post_id: string;
   user_name: string;
@@ -23,6 +24,7 @@ export interface BackendPost {
   media_urls?: string[];
   like_count: number;
   comment_count?: number; 
+  is_liked?: boolean; 
 }
 
 export default function App() {
@@ -33,8 +35,8 @@ export default function App() {
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [followedTags, setFollowedTags] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [likedPostIds, setLikedPostIds] = useState<Set<string>>(new Set());
 
-  // 🌟 ESTA ES LA FUNCIÓN MÁGICA QUE DESCARGA LOS DATOS REALES 🌟
   const loadPosts = async () => {
     const token = localStorage.getItem("token");
     let myTag = localStorage.getItem("user_tag");
@@ -62,7 +64,7 @@ export default function App() {
     const token = localStorage.getItem("token");
     if (token) {
       setIsLoggedIn(true);
-      loadPosts(); // 1. Soluciona la amnesia (se llama al recargar la página)
+      loadPosts(); 
     }
     setIsLoading(false);
   }, []);
@@ -73,30 +75,39 @@ export default function App() {
   };
 
   function handleAddPost(newPost: any) {
-    // 2. Soluciona el ID falso (Descargamos los posts reales en vez de inventar uno)
-    // Cuando CreatePost termina de enviar a AWS, esto baja el post con el UUID real.
     loadPosts(); 
   }
 
-  async function handleToggleLike(postId: string) {
-    const token = localStorage.getItem("token");
-    if (!token) return;
+async function handleToggleLike(postId: string) {
+  const token = localStorage.getItem("token");
+  if (!token) return;
 
-    try {
-      await fetch(`http://localhost:8080/v1/posts/${postId}/likes`, {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${token}`,
-          "Content-Type": "application/json"
-        }
+  const alreadyLiked = likedPostIds.has(postId);
+
+  try {
+    if (alreadyLiked) {
+      await fetch(`http://localhost:8080/v1/posts/${postId}/likes/me`, {
+        method: "DELETE",
+        headers: { "Authorization": `Bearer ${token}` },
       });
       setPosts((prev) =>
-        prev.map((post) => post.post_id === postId ? { ...post, like_count: post.like_count + 1 } : post)
+        prev.map((p) => p.post_id === postId ? { ...p, like_count: Math.max(0, p.like_count - 1) } : p)
       );
-    } catch (err) {
-      console.error("Error al dar like:", err);
+      setLikedPostIds((prev) => { const next = new Set(prev); next.delete(postId); return next; });
+    } else {
+      await fetch(`http://localhost:8080/v1/posts/${postId}/likes`, {
+        method: "POST",
+        headers: { "Authorization": `Bearer ${token}` },
+      });
+      setPosts((prev) =>
+        prev.map((p) => p.post_id === postId ? { ...p, like_count: p.like_count + 1 } : p)
+      );
+      setLikedPostIds((prev) => new Set(prev).add(postId));
     }
+  } catch (err) {
+    console.error("Error al togglear like:", err);
   }
+}
 
   async function handleToggleFollow(targetTag: string) {
     const token = localStorage.getItem("token");
@@ -134,7 +145,6 @@ export default function App() {
         body: JSON.stringify({ text })
       });
       
-      // Actualizamos el contador localmente
       setPosts((prev) =>
         prev.map((post) =>
           post.post_id === postId ? { ...post, comment_count: (post.comment_count || 0) + 1 } : post
@@ -145,13 +155,47 @@ export default function App() {
     }
   };
 
-  
-
   async function handleDeletePost(postId: string) {
-    
-    setPosts((prev) => prev.filter((post) => post.post_id !== postId));
-    setSelectedPost(null);
-    console.log("Post borrado visualmente (modo demo)");
+    const token = localStorage.getItem("token");
+    if (!token) return;
+
+    try {
+      const response = await fetch(`http://localhost:8080/v1/posts/${postId}/me`, {
+        method: "DELETE",
+        headers: { "Authorization": `Bearer ${token}` }
+      });
+
+      if (response.ok) {
+        setPosts((prev) => prev.filter((post) => post.post_id !== postId));
+        setSelectedPost(null);
+      }
+    } catch (err) {
+      console.error("Error al borrar post:", err);
+    }
+  }
+
+  async function handleDeleteComment(postId: string, commentId: string) {
+    const token = localStorage.getItem("token");
+    if (!token) return;
+
+    try {
+      const response = await fetch(`http://localhost:8080/v1/comments/${commentId}/me`, {
+        method: "DELETE",
+        headers: { "Authorization": `Bearer ${token}` }
+      });
+
+      if (response.ok) {
+        setPosts((prev) =>
+          prev.map((post) =>
+            post.post_id === postId ? { ...post, comment_count: Math.max(0, (post.comment_count || 0) - 1) } : post
+          )
+        );
+        return true;
+      }
+    } catch (err) {
+      console.error("Error al borrar comentario:", err);
+    }
+    return false;
   }
 
   function handleEditPost(postId: string, newText: string) {
@@ -173,7 +217,7 @@ export default function App() {
       time: new Date(p.created_at).toLocaleDateString(),
       likes: p.like_count,
       comments: p.comment_count || 0,
-      liked: false,
+      liked: likedPostIds.has(p.post_id),
       following: followedTags.includes(rawTag.replace("@", "")),
       isOwnPost: rawTag.replace("@", "") === (localStorage.getItem("user_tag") || "").replace("@", ""),
       location: "Monterrey, MX",
@@ -182,12 +226,10 @@ export default function App() {
     };
   };
 
-  // Ordenamos los posts: tomamos la fecha 'created_at' y comparamos
   const sortedPosts = [...posts].sort((a, b) => {
     return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
   });
 
-  // Ahora usamos sortedPosts en lugar de posts para mapear
   const legacyMappedPosts: Post[] = sortedPosts.map(mapToPost);
 
   function renderPage() {
@@ -277,7 +319,9 @@ export default function App() {
         onLike={(id) => handleToggleLike(id)}
         onFollow={() => selectedPost && handleToggleFollow(selectedPost.user_tag)}
         onAddComment={(id, txt) => handleAddComment(id, txt)}
-        onDeleteComment={() => {}}
+        
+        onDeleteComment={(commentId) => selectedPost && handleDeleteComment(selectedPost.post_id, commentId)}
+        
         onEdit={(id, txt) => handleEditPost(id, txt)}
         onDelete={() => selectedPost && handleDeletePost(selectedPost.post_id)}
       />

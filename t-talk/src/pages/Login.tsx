@@ -20,7 +20,6 @@ export default function Login() {
     setIsLoading(true);
 
     try {
-      // 🚀 CONEXIÓN REAL AL BACKEND DE RUST
       const response = await fetch("http://localhost:8080/v1/auth/login", {
         method: "POST",
         headers: {
@@ -40,16 +39,13 @@ export default function Login() {
       const data = await response.json();
       console.log("¡Login exitoso!", data);
 
-      // 💾 Guardamos el token y los datos del usuario en LocalStorage
       if (data.token) {
         localStorage.setItem("token", data.token);
         
-        // Se utilizan los datos devueltos por el servidor o se genera un fallback seguro
         localStorage.setItem("user_tag", data.user_tag || email.split('@')[0] || "usuario");
         localStorage.setItem("user_name", data.user_name || "Usuario");
       }
 
-      // 🌟 REDIRECCIÓN DIRECTA AL HOME
       window.location.href = "/";
 
     } catch (err: any) {

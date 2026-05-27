@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import type { Post } from "../services/api";
-import { getComments } from "../services/api";
 import {
   Heart,
   MessageCircle,
@@ -25,6 +24,16 @@ type Props = {
   onDelete: () => void;
 };
 
+interface BackendComment {
+  comment_id: string;
+  user_name: string;
+  user_tag: string;
+  user_profile_pic_url?: string;
+  text: string;
+  created_at: string;
+  like_count: number;
+}
+
 export default function PostModal({
   post,
   onClose,
@@ -38,17 +47,34 @@ export default function PostModal({
   const [editing, setEditing] = useState(false);
   const [editedText, setEditedText] = useState("");
   const [comment, setComment] = useState("");
-  const [liveComments, setLiveComments] = useState<any[]>([]);
+  const [liveComments, setLiveComments] = useState<BackendComment[]>([]);
+  const [liked, setLiked] = useState(false);
+  const [likeCount, setLikeCount] = useState(0);
+
+  const myTag = (localStorage.getItem("user_tag") || "").replace("@", "");
+
+  const fetchComments = async (postId: string) => {
+    const token = localStorage.getItem("token");
+    try {
+      const res = await fetch(`http://localhost:8080/v1/posts/${postId}/comments`, {
+        headers: { "Authorization": `Bearer ${token}` },
+      });
+      if (!res.ok) return;
+      const data: BackendComment[] = await res.json();
+      setLiveComments(data || []);
+    } catch (err) {
+      console.error("Error cargando comentarios:", err);
+    }
+  };
 
   useEffect(() => {
     if (post) {
       document.body.style.overflow = "hidden";
       setEditedText(post.text);
-      getComments(post.id).then(data => {
-        setLiveComments(data);
-      });
+      setLiked(post.liked ?? false);
+      setLikeCount(post.likes);
+      fetchComments(post.id);
     }
-
     return () => {
       document.body.style.overflow = "auto";
     };
@@ -58,8 +84,33 @@ export default function PostModal({
 
   function handleSaveEdit() {
     if (!editedText.trim()) return;
-    onEdit(post.id, editedText);
+    onEdit(post!.id, editedText);
     setEditing(false);
+  }
+
+  async function handleToggleLike() {
+    const token = localStorage.getItem("token");
+    if (!token) return;
+
+    if (liked) {
+      // Unlike
+      await fetch(`http://localhost:8080/v1/posts/${post!.id}/likes/me`, {
+        method: "DELETE",
+        headers: { "Authorization": `Bearer ${token}` },
+      });
+      setLiked(false);
+      setLikeCount((c) => Math.max(0, c - 1));
+    } else {
+      // Like
+      await fetch(`http://localhost:8080/v1/posts/${post!.id}/likes`, {
+        method: "POST",
+        headers: { "Authorization": `Bearer ${token}` },
+      });
+      setLiked(true);
+      setLikeCount((c) => c + 1);
+    }
+
+    onLike(post!.id);
   }
 
   async function handleSubmitComment() {
@@ -68,19 +119,27 @@ export default function PostModal({
     const textoComentario = comment;
     setComment("");
 
-    const nuevoComentarioLocal = {
-      id: Date.now().toString(),
-      name: localStorage.getItem("user_name") || "Usuario",
-      tag: `@${(localStorage.getItem("user_tag") || "usuario").replace("@", "")}`,
-      avatar: localStorage.getItem("user_profile_picture_url") || "https://images.unsplash.com/photo-1494790108377-be9c29b29330?q=80&w=400",
-      text: textoComentario,
-      likes: 0,
-      liked: false,
-      time: "Justo ahora"
-    };
-
-    setLiveComments((prev) => [...prev, nuevoComentarioLocal]);
     await onAddComment(post.id, textoComentario);
+
+    await fetchComments(post.id);
+  }
+
+  async function handleDeleteComment(commentId: string) {
+    const token = localStorage.getItem("token");
+    if (!token) return;
+
+    try {
+      const res = await fetch(`http://localhost:8080/v1/comments/${commentId}/me`, {
+        method: "DELETE",
+        headers: { "Authorization": `Bearer ${token}` },
+      });
+      if (res.ok) {
+        setLiveComments((prev) => prev.filter((c) => c.comment_id !== commentId));
+        onDeleteComment(post!.id, commentId);
+      }
+    } catch (err) {
+      console.error("Error borrando comentario:", err);
+    }
   }
 
   return (
@@ -110,14 +169,8 @@ export default function PostModal({
                 <h2 className="font-bold text-gray-900 text-[16px] leading-tight">{post.name}</h2>
                 <p className="text-gray-400 text-xs mt-0.5">{post.tag}</p>
                 <div className="flex items-center gap-3 text-xs font-medium text-gray-400 mt-1.5">
-                  <div className="flex items-center gap-1">
-                    <Clock3 size={12} />
-                    <span>{post.time}</span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <MapPin size={12} />
-                    <span>{post.location}</span>
-                  </div>
+                  <div className="flex items-center gap-1"><Clock3 size={12} /><span>{post.time}</span></div>
+                  <div className="flex items-center gap-1"><MapPin size={12} /><span>{post.location}</span></div>
                 </div>
               </div>
             </div>
@@ -145,7 +198,7 @@ export default function PostModal({
                   {editing ? "Guardar" : "Editar"}
                 </button>
                 <button
-                  
+                  onClick={onDelete}
                   className="px-3.5 py-1.5 rounded-full text-xs font-semibold bg-red-50 text-red-600 hover:bg-red-100 transition flex items-center gap-1"
                 >
                   <Trash2 size={13} />
@@ -174,11 +227,11 @@ export default function PostModal({
 
           <div className="flex items-center gap-6 border-y border-gray-200/30 py-3.5 text-gray-400">
             <button
-              onClick={() => onLike(post.id)}
-              className={`flex items-center gap-1.5 text-xs font-semibold transition duration-150 ${post.liked ? "text-pink-500" : "hover:text-pink-500"}`}
+              onClick={handleToggleLike}
+              className={`flex items-center gap-1.5 text-xs font-semibold transition duration-150 ${liked ? "text-pink-500" : "hover:text-pink-500"}`}
             >
-              <Heart size={18} fill={post.liked ? "currentColor" : "none"} />
-              <span>{post.likes} Me gusta</span>
+              <Heart size={18} fill={liked ? "currentColor" : "none"} />
+              <span>{likeCount} Me gusta</span>
             </button>
             <div className="flex items-center gap-1.5 text-xs font-semibold text-gray-400">
               <MessageCircle size={18} />
@@ -207,21 +260,36 @@ export default function PostModal({
           </div>
 
           <div className="space-y-3 pt-2">
-            {liveComments.map((c) => (
-              <div key={c.id} className="bg-white/40 border border-gray-200/30 rounded-2xl p-4">
-                <div className="flex justify-between items-start gap-2">
-                  <div className="flex gap-3 min-w-0">
-                    <img src={c.avatar || "https://images.unsplash.com/photo-1494790108377-be9c29b29330?q=80&w=400"} alt={c.name} className="w-9 h-9 rounded-full object-cover shrink-0" />
-                    <div>
-                      <div className="font-bold text-gray-900 text-sm">{c.name}</div>
-                      <div className="text-gray-400 text-xs">{c.tag}</div>
+            {liveComments.map((c) => {
+              const isMyComment = (c.user_tag || "").replace("@", "") === myTag;
+              return (
+                <div key={c.comment_id} className="bg-white/40 border border-gray-200/30 rounded-2xl p-4">
+                  <div className="flex justify-between items-start gap-2">
+                    <div className="flex gap-3 min-w-0">
+                      <img
+                        src={c.user_profile_pic_url || "https://images.unsplash.com/photo-1494790108377-be9c29b29330?q=80&w=400"}
+                        alt={c.user_name}
+                        className="w-9 h-9 rounded-full object-cover shrink-0"
+                      />
+                      <div>
+                        <div className="font-bold text-gray-900 text-sm">{c.user_name}</div>
+                        <div className="text-gray-400 text-xs">@{(c.user_tag || "").replace("@", "")}</div>
+                      </div>
                     </div>
+                   
+                    {isMyComment && (
+                      <button
+                        onClick={() => handleDeleteComment(c.comment_id)}
+                        className="text-gray-300 hover:text-red-400 transition p-1 rounded-full hover:bg-red-50 shrink-0"
+                      >
+                        <Trash2 size={13} />
+                      </button>
+                    )}
                   </div>
-                  
+                  <p className="text-gray-700 text-[14px] mt-2.5">{c.text}</p>
                 </div>
-                <p className="text-gray-700 text-[14px] mt-2.5">{c.text}</p>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       </div>
