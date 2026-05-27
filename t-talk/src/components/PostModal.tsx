@@ -32,6 +32,7 @@ interface BackendComment {
   text: string;
   created_at: string;
   like_count: number;
+  liked?: boolean;
 }
 
 export default function PostModal({
@@ -141,6 +142,47 @@ export default function PostModal({
       console.error("Error borrando comentario:", err);
     }
   }
+
+  async function handleToggleCommentLike(commentId: string) {
+  const token = localStorage.getItem("token");
+  if (!token) return;
+
+  const comment = liveComments.find((c) => c.comment_id === commentId);
+  if (!comment) return;
+
+  const alreadyLiked = comment.liked ?? false;
+
+  try {
+    if (alreadyLiked) {
+      await fetch(`http://localhost:8080/v1/comments/${commentId}/likes/me`, {
+        method: "DELETE",
+        headers: { "Authorization": `Bearer ${token}` },
+      });
+    } else {
+      await fetch(`http://localhost:8080/v1/comments/${commentId}/likes`, {
+        method: "POST",
+        headers: { "Authorization": `Bearer ${token}` },
+      });
+    }
+
+    setLiveComments((prev) =>
+      prev.map((c) =>
+        c.comment_id === commentId
+          ? {
+              ...c,
+              liked: !alreadyLiked,
+              like_count: alreadyLiked
+                ? Math.max(0, c.like_count - 1)
+                : c.like_count + 1,
+            }
+          : c
+      )
+    );
+  } catch (err) {
+    console.error("Error al togglear like en comentario:", err);
+  }
+}
+
 
   return (
     <div
@@ -286,7 +328,16 @@ export default function PostModal({
                       </button>
                     )}
                   </div>
-                  <p className="text-gray-700 text-[14px] mt-2.5">{c.text}</p>
+                    <p className="text-gray-700 text-[14px] mt-2.5">{c.text}</p>
+                    <button
+                      onClick={() => handleToggleCommentLike(c.comment_id)}
+                      className={`flex items-center gap-1 mt-2 text-xs font-semibold transition-colors duration-150 active:scale-95 ${
+                        c.liked ? "text-pink-500" : "text-gray-400 hover:text-pink-500"
+                      }`}
+                    >
+                      <Heart size={13} fill={c.liked ? "currentColor" : "none"} />
+                      <span>{c.like_count}</span>
+                    </button>
                 </div>
               );
             })}

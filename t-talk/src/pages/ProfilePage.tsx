@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import PostCard from "../components/PostCard";
-import { Pencil, MapPin, Sparkles, X, Check, Loader2 } from "lucide-react";
+import { Pencil, MapPin, Sparkles, X, Check, Loader2, Trash2, Image } from "lucide-react";
 import type { Post } from "../services/api";
 
 interface Props {
@@ -10,18 +10,6 @@ interface Props {
   onFollowPost?: (tag: string) => void;
   onDeletePost?: (id: string) => void;
   onEditPost?: (id: string, text: string) => void;
-}
-
-interface BackendPost {
-  post_id: string;
-  user_name: string;
-  user_tag: string;
-  user_profile_pic_url?: string;
-  text: string;
-  created_at: string;
-  media_urls?: string[];
-  like_count: number;
-  comment_count?: number;
 }
 
 export default function ProfilePage({
@@ -36,6 +24,7 @@ export default function ProfilePage({
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   const [profileData, setProfileData] = useState({
     name: "",
@@ -47,30 +36,29 @@ export default function ProfilePage({
 
   const [followersCount, setFollowersCount] = useState(0);
   const [followingCount, setFollowingCount] = useState(0);
+  const [likedPosts, setLikedPosts] = useState<Post[]>([]);
 
   const [tempName, setTempName] = useState("");
   const [tempBio, setTempBio] = useState("");
   const [tempLocation, setTempLocation] = useState("");
-
-  
-  const [likedPosts, setLikedPosts] = useState<Post[]>([]);
+  const [tempPhotoUrl, setTempPhotoUrl] = useState("");
 
   useEffect(() => {
     const loadProfile = async () => {
       const token = localStorage.getItem("token");
       let myTag = (localStorage.getItem("user_tag") || "").replace("@", "");
-      if (!myTag) { myTag = "usuario"; }
+      if (!myTag) myTag = "usuario";
 
       try {
         const [userRes, followersRes, followingRes] = await Promise.all([
           fetch(`http://localhost:8080/v1/users/${myTag}`, {
-            headers: { "Authorization": `Bearer ${token}` },
+            headers: { Authorization: `Bearer ${token}` },
           }),
           fetch(`http://localhost:8080/v1/users/${myTag}/followers`, {
-            headers: { "Authorization": `Bearer ${token}` },
+            headers: { Authorization: `Bearer ${token}` },
           }),
           fetch(`http://localhost:8080/v1/users/${myTag}/following`, {
-            headers: { "Authorization": `Bearer ${token}` },
+            headers: { Authorization: `Bearer ${token}` },
           }),
         ]);
 
@@ -117,21 +105,26 @@ export default function ProfilePage({
   const myTag = (localStorage.getItem("user_tag") || "").replace("@", "");
   const myPosts = posts.filter((p) => p.tag.replace("@", "") === myTag);
 
-
   useEffect(() => {
     if (activeTab !== "liked") return;
-
-    const loadLikedPosts = async () => {
-      const token = localStorage.getItem("token");
-  
-      const filtered = posts.filter((p) => p.liked);
-      setLikedPosts(filtered);
-    };
-
-    loadLikedPosts();
+    setLikedPosts(posts.filter((p) => p.liked));
   }, [activeTab, posts]);
 
-  // Guarda cambios del perfil en el backend
+  async function handleDeleteAccount() {
+    const token = localStorage.getItem("token");
+    if (!token) return;
+
+    const res = await fetch("http://localhost:8080/v1/users/me", {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+    if (res.ok) {
+      localStorage.clear();
+      window.location.reload();
+    }
+  }
+
   async function handleSaveProfile() {
     if (!tempName.trim()) return;
     const token = localStorage.getItem("token");
@@ -141,12 +134,13 @@ export default function ProfilePage({
       const res = await fetch(`http://localhost:8080/v1/users/${profileData.tag}`, {
         method: "PUT",
         headers: {
-          "Authorization": `Bearer ${token}`,
+          Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
           name: tempName,
           bio: tempBio,
+          // profile_picture_url: tempPhotoUrl, // ← descomentar cuando el backend lo soporte
         }),
       });
 
@@ -156,8 +150,10 @@ export default function ProfilePage({
           name: tempName,
           bio: tempBio,
           location: tempLocation,
+          // profile_picture_url: tempPhotoUrl || prev.profile_picture_url,
         }));
         localStorage.setItem("user_name", tempName);
+        window.dispatchEvent(new Event("profile-updated"));
       }
     } catch (err) {
       console.error("Error guardando perfil:", err);
@@ -171,6 +167,7 @@ export default function ProfilePage({
     setTempName(profileData.name);
     setTempBio(profileData.bio);
     setTempLocation(profileData.location);
+    setTempPhotoUrl(profileData.profile_picture_url);
     setIsEditingProfile(true);
   }
 
@@ -193,6 +190,7 @@ export default function ProfilePage({
         </div>
 
         <div className="px-6 pb-6 relative">
+          {/* Foto + nombre */}
           <div className="flex justify-between items-start gap-4">
             <div className="relative">
               <img
@@ -213,13 +211,16 @@ export default function ProfilePage({
               </div>
             </div>
 
-            <button
-              onClick={handleOpenModal}
-              className="mt-4 bg-gray-950 hover:bg-gray-800 text-white font-bold text-xs shadow-sm hover:shadow transition-all duration-200 px-4 py-2 rounded-full flex items-center gap-1.5 active:scale-95"
-            >
-              <Pencil size={12} />
-              Editar perfil
-            </button>
+            {/* Botones — apilados verticalmente para que no choquen */}
+            <div className="mt-4">
+              <button
+                onClick={handleOpenModal}
+                className="bg-gray-950 hover:bg-gray-800 text-white font-bold text-xs shadow-sm hover:shadow transition-all duration-200 px-4 py-2 rounded-full flex items-center gap-1.5 active:scale-95"
+              >
+                <Pencil size={12} />
+                Editar perfil
+              </button>
+            </div>
           </div>
 
           <p className="mt-4 text-sm leading-relaxed text-gray-600 font-medium max-w-xl">
@@ -270,17 +271,54 @@ export default function ProfilePage({
               onLike={() => onLikePost?.(post.id)}
               onFollow={() => onFollowPost?.(post.tag)}
               onDelete={() => onDeletePost?.(post.id)}
-              onEdit={(newText) => onEditPost?.(post.id, newText)}
+              onEdit={(id, newText) => onEditPost?.(id, newText)}
             />
           ))
         ) : (
           <div className="text-center py-12 bg-white/30 border border-dashed border-gray-200 rounded-[24px] text-gray-400 text-xs font-medium">
             {activeTab === "posts"
               ? "Aún no has creado ninguna publicación pública."
-              : "Aún no le has dado 'Me gusta' a ninguna publicación."}
+              : "Aún no le has dado 'Me gusta' a ninguna publicación. Explora el feed para verlos."}
           </div>
         )}
       </div>
+
+      {/* Modal confirmar eliminar cuenta */}
+      {showDeleteConfirm && (
+        <div
+          className="fixed inset-0 bg-black/50 backdrop-blur-md flex items-center justify-center z-50 p-4 animate-fade-in"
+          onClick={() => setShowDeleteConfirm(false)}
+        >
+          <div
+            className="bg-white/95 backdrop-blur-2xl border border-white rounded-[28px] p-6 shadow-xl w-full max-w-sm space-y-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex flex-col items-center text-center gap-2">
+              <div className="w-12 h-12 rounded-full bg-red-50 border border-red-100 flex items-center justify-center">
+                <Trash2 size={20} className="text-red-500" />
+              </div>
+              <h3 className="font-black text-gray-900 text-base">¿Eliminar tu cuenta?</h3>
+              <p className="text-xs text-gray-500 leading-relaxed max-w-xs">
+                Esta acción es permanente e irreversible. Todos tus posts, comentarios y datos serán eliminados.
+              </p>
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setShowDeleteConfirm(false)}
+                className="flex-1 py-2.5 rounded-full text-xs font-bold bg-gray-100 hover:bg-gray-200 text-gray-700 transition active:scale-95"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleDeleteAccount}
+                className="flex-1 py-2.5 rounded-full text-xs font-bold bg-red-500 hover:bg-red-600 text-white transition active:scale-95"
+              >
+                Sí, eliminar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Modal editar perfil */}
       {isEditingProfile && (
@@ -289,7 +327,7 @@ export default function ProfilePage({
           onClick={() => setIsEditingProfile(false)}
         >
           <div
-            className="bg-white/95 backdrop-blur-2xl border border-white rounded-[28px] p-6 shadow-xl w-full max-w-md space-y-4 transition-all"
+            className="bg-white/95 backdrop-blur-2xl border border-white rounded-[28px] p-6 shadow-xl w-full max-w-md space-y-4"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between border-b border-gray-100 pb-3">
@@ -303,7 +341,36 @@ export default function ProfilePage({
                 <X size={14} />
               </button>
             </div>
+
             <div className="space-y-3.5">
+              {/* Preview foto */}
+              <div className="flex items-center gap-4">
+                <img
+                  src={tempPhotoUrl || profileData.profile_picture_url}
+                  alt="Preview"
+                  className="w-14 h-14 rounded-full object-cover border-2 border-white shadow"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).src =
+                      "https://images.unsplash.com/photo-1494790108377-be9c29b29330?q=80&w=400";
+                  }}
+                />
+                <div className="flex-1 min-w-0">
+                  <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wide block mb-1 flex items-center gap-1">
+                    <Image size={10} /> Foto de perfil (URL)
+                  </label>
+                  <input
+                    type="text"
+                    value={tempPhotoUrl}
+                    onChange={(e) => setTempPhotoUrl(e.target.value)}
+                    placeholder="https://..."
+                    disabled // ← quitar cuando el backend soporte PUT con foto
+                    className="w-full bg-gray-100 border border-gray-200/60 rounded-xl px-3 py-2 text-xs text-gray-400 font-medium outline-none cursor-not-allowed"
+                    title="Disponible próximamente — pendiente de backend"
+                  />
+                  <p className="text-[10px] text-gray-400 mt-1">Próximamente disponible</p>
+                </div>
+              </div>
+
               <div>
                 <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wide block mb-1">
                   Nombre Público
@@ -315,6 +382,7 @@ export default function ProfilePage({
                   className="w-full bg-gray-50/50 border border-gray-200/60 rounded-xl px-3 py-2 text-xs text-gray-900 font-medium outline-none focus:border-gray-300 transition"
                 />
               </div>
+
               <div>
                 <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wide block mb-1">
                   Ubicación
@@ -326,6 +394,7 @@ export default function ProfilePage({
                   className="w-full bg-gray-50/50 border border-gray-200/60 rounded-xl px-3 py-2 text-xs text-gray-900 font-medium outline-none focus:border-gray-300 transition"
                 />
               </div>
+
               <div>
                 <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wide block mb-1">
                   Biografía
@@ -338,11 +407,24 @@ export default function ProfilePage({
                 />
               </div>
             </div>
-            <div className="flex justify-end pt-2">
+
+            <div className="flex items-center justify-between pt-2 border-t border-gray-100">
+              <button
+                onClick={() => {
+                  setIsEditingProfile(false);
+                  setShowDeleteConfirm(true);
+                }}
+                className="flex items-center gap-1.5 text-xs font-bold text-red-400 hover:text-red-600 hover:bg-red-50 px-3 py-2 rounded-full transition active:scale-95"
+              >
+                <Trash2 size={12} />
+                Eliminar cuenta
+              </button>
+
               <button
                 onClick={handleSaveProfile}
                 disabled={!tempName.trim() || isSaving}
-                className="bg-gray-950 hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold text-xs px-5 py-2 rounded-full flex items-center gap-1.5 shadow-sm transition active:scale-95">
+                className="bg-gray-950 hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold text-xs px-5 py-2 rounded-full flex items-center gap-1.5 shadow-sm transition active:scale-95"
+              >
                 {isSaving ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} strokeWidth={2.5} />}
                 {isSaving ? "Guardando..." : "Guardar Cambios"}
               </button>

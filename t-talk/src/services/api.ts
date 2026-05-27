@@ -30,147 +30,167 @@ export type Post = {
   commentsData: CommentType[];
 };
 
-export const currentUser = {
-  name: localStorage.getItem("user_name") || "Ana Ruiz",
-  tag: localStorage.getItem("user_tag") || "anarz",
-  avatar: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?q=80&w=400",
-  location: "Monterrey, MX",
-};
-
-const USE_MOCK = false;
 const API_URL = "http://localhost:8080/v1";
 
-interface BackendPost {
-  post_id: string;
-  user_name: string;
-  user_tag: string;
-  user_profile_pic_url: string;
-  text: string;
-  created_at: string;
-  media_urls: string[];
-  like_count: number;
-}
-
-interface BackendComment {
-  comment_id: string;
-  post_id: string;
-  text: string;
-  created_at: string;
-  parent_comment_id: string | null;
-  root_comment_id: string;
-  user_name: string;
-  user_tag: string;
-  user_profile_pic_url: string;
-  media_urls: string[];
-  like_count: number;
-}
-
-function mapBackendPostToFrontend(bp: BackendPost): Post {
-  return {
-    id: bp.post_id,
-    name: bp.user_name,
-    tag: `@${bp.user_tag}`,
-    avatar: bp.user_profile_pic_url,
-    text: bp.text,
-    likes: bp.like_count,
-    comments: 0, 
-    liked: false, 
-    following: false,
-    image: bp.media_urls?.[0] || undefined, 
-    time: new Date(bp.created_at).toLocaleDateString(), 
-    location: "Monterrey", 
-    isOwnPost: bp.user_tag === localStorage.getItem("user_tag"),
-    reposts: 0,
-    views: "0",
-    commentsData: []
-  };
-}
-
-function mapBackendCommentToFrontend(bc: BackendComment): CommentType {
-  return {
-    id: bc.comment_id,
-    name: bc.user_name,
-    tag: `@${bc.user_tag}`,
-    avatar: bc.user_profile_pic_url,
-    text: bc.text,
-    likes: bc.like_count,
-    liked: false,
-    time: new Date(bc.created_at).toLocaleDateString()
-  };
-}
-
-function getAuthHeaders() {
+function getAuthHeaders(): Record<string, string> {
   const token = localStorage.getItem("token");
   return {
     "Content-Type": "application/json",
-    ...(token ? { "Authorization": `Bearer ${token}` } : {})
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
   };
 }
 
-export async function login(body: any) {
-  const response = await fetch(`${API_URL}/auth/login`, {
+// Auth
+export async function login(body: { email: string; password: string }) {
+  const res = await fetch(`${API_URL}/auth/login`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
-  if (!response.ok) throw new Error("Credenciales inválidas");
-  const res = await response.json();
-  localStorage.setItem("token", res.token);
-  return res;
+  if (!res.ok) throw new Error("Credenciales inválidas");
+  const data = await res.json();
+  localStorage.setItem("token", data.token);
+  return data;
 }
 
-export async function createPost(data: { text: string; media_urls?: string[] }) {
-  const response = await fetch(`${API_URL}/posts`, {
+// Posts
+export async function createPost(data: { text: string; url?: string }) {
+  const res = await fetch(`${API_URL}/posts`, {
     method: "POST",
     headers: getAuthHeaders(),
-    body: JSON.stringify({
-      text: data.text,
-      media_urls: data.media_urls || []
-    }),
+    body: JSON.stringify({ text: data.text, url: data.url ?? null }),
   });
-  return response.ok;
-}
-
-export async function likePost(id: string) {
-  const response = await fetch(`${API_URL}/posts/${id}/likes`, {
-    method: "POST",
-    headers: getAuthHeaders()
-  });
-  return response.ok;
+  return res.ok;
 }
 
 export async function deletePost(id: string) {
-  const response = await fetch(`${API_URL}/posts/${id}`, {
+  const res = await fetch(`${API_URL}/posts/${id}/me`, {  // ✅ ruta correcta
     method: "DELETE",
-    headers: getAuthHeaders()
+    headers: getAuthHeaders(),
   });
-  return response.ok;
+  return res.ok;
 }
 
 export async function editPost(id: string, text: string) {
-  const response = await fetch(`${API_URL}/posts/${id}`, {
+  const res = await fetch(`${API_URL}/posts/${id}`, {     // pendiente backend
     method: "PUT",
     headers: getAuthHeaders(),
     body: JSON.stringify({ text }),
   });
-  return response.json();
+  return res.ok;
 }
 
+export async function likePost(id: string) {
+  const res = await fetch(`${API_URL}/posts/${id}/likes`, {
+    method: "POST",
+    headers: getAuthHeaders(),
+  });
+  return res.ok;
+}
 
+export async function unlikePost(id: string) {
+  const res = await fetch(`${API_URL}/posts/${id}/likes/me`, {
+    method: "DELETE",
+    headers: getAuthHeaders(),
+  });
+  return res.ok;
+}
+
+// Comentarios
 export async function getComments(postId: string) {
-  const token = localStorage.getItem("token");
-  try {
-    const response = await fetch(`http://localhost:8080/v1/posts/${postId}/comments`, {
-      headers: {
-        "Authorization": `Bearer ${token}`,
-      }
-    });
-    
-    if (!response.ok) return []; 
-    const data = await response.json();
-    return data; 
-  } catch (error) {
-    console.error("Error al obtener comentarios:", error);
-    return [];
-  }
+  const res = await fetch(`${API_URL}/posts/${postId}/comments`, {
+    headers: getAuthHeaders(),
+  });
+  if (!res.ok) return [];
+  return res.json();
+}
+
+export async function addComment(postId: string, text: string) {
+  const res = await fetch(`${API_URL}/posts/${postId}/comments`, {
+    method: "POST",
+    headers: getAuthHeaders(),
+    body: JSON.stringify({ text }),
+  });
+  return res.ok;
+}
+
+export async function deleteComment(commentId: string) {
+  const res = await fetch(`${API_URL}/comments/${commentId}/me`, {
+    method: "DELETE",
+    headers: getAuthHeaders(),
+  });
+  return res.ok;
+}
+
+export async function likeComment(id: string) {
+  const res = await fetch(`${API_URL}/comments/${id}/likes`, {
+    method: "POST",
+    headers: getAuthHeaders(),
+  });
+  return res.ok;
+}
+
+export async function unlikeComment(id: string) {
+  const res = await fetch(`${API_URL}/comments/${id}/likes/me`, {
+    method: "DELETE",
+    headers: getAuthHeaders(),
+  });
+  return res.ok;
+}
+
+// Usuarios
+export async function getUser(tag: string) {
+  const res = await fetch(`${API_URL}/users/${tag}`, {
+    headers: getAuthHeaders(),
+  });
+  if (!res.ok) return null;
+  return res.json();
+}
+
+export async function getUserPosts(tag: string) {
+  const res = await fetch(`${API_URL}/users/${tag}/posts`, {
+    headers: getAuthHeaders(),
+  });
+  if (!res.ok) return [];
+  return res.json();
+}
+
+export async function getFollowers(tag: string) {
+  const res = await fetch(`${API_URL}/users/${tag}/followers`, {
+    headers: getAuthHeaders(),
+  });
+  if (!res.ok) return [];
+  return res.json();
+}
+
+export async function getFollowing(tag: string) {
+  const res = await fetch(`${API_URL}/users/${tag}/following`, {
+    headers: getAuthHeaders(),
+  });
+  if (!res.ok) return [];
+  return res.json();
+}
+
+export async function followUser(tag: string) {
+  const res = await fetch(`${API_URL}/users/${tag}/followers`, {
+    method: "POST",
+    headers: getAuthHeaders(),
+  });
+  return res.ok;
+}
+
+export async function unfollowUser(tag: string) {
+  const res = await fetch(`${API_URL}/users/${tag}/followers/me`, {
+    method: "DELETE",
+    headers: getAuthHeaders(),
+  });
+  return res.ok;
+}
+
+export async function deleteAccount() {
+  const res = await fetch(`${API_URL}/users/me`, {
+    method: "DELETE",
+    headers: getAuthHeaders(),
+  });
+  return res.ok;
 }
