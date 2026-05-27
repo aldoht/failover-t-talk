@@ -157,3 +157,11 @@ pub async fn update_user(
 
     Ok(Json(updated.into()))
 }
+
+pub async fn me(
+    State(db_pool): State<PgPool>,
+    claims: Claims,
+) -> Result<Json<UserResponse>, AppError> {
+    let user = db::users::get_user_by_id(&db_pool, claims.sub).await?;
+    Ok(Json(user.into()))
+}
