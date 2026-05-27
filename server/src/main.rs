@@ -1,9 +1,10 @@
 use std::sync::LazyLock;
+use std::time::Instant;
 
-use axum::{Json, Router, routing::{delete, get, post}};
+use axum::{Json, Router, routing::{delete, get, post}, extract::{MatchedPath, Request}, middleware::{self, Next}, response::Response};
 use tower::ServiceBuilder;
-use tower_http::{cors::{Any, CorsLayer}, trace::{DefaultMakeSpan, DefaultOnResponse, TraceLayer}};
-use prometheus::{Counter, Encoder, TextEncoder, register_counter};
+use tower_http::trace::{DefaultMakeSpan, DefaultOnResponse, TraceLayer};
+use prometheus::{Encoder, TextEncoder, HistogramVec, IntCounterVec, register_histogram_vec, register_int_counter_vec};
 use serde::Serialize;
 use tokio::net::TcpListener;
 use tracing::Level;
@@ -17,9 +18,48 @@ mod utils;
 mod endpoints;
 mod errors;
 
-static REQUEST_COUNTER: LazyLock<Counter> = LazyLock::new(|| {
-    register_counter!("http_requests_total", "Total HTTP requests").unwrap()
+static HTTP_REQUESTS: LazyLock<IntCounterVec> = LazyLock::new(|| {
+    register_int_counter_vec!(
+        "http_requests_total",
+        "Total HTTP requests",
+        &["method", "path", "status"]
+    ).unwrap()
 });
+
+static HTTP_DURATION: LazyLock<HistogramVec> = LazyLock::new(|| {
+    register_histogram_vec!(
+        "http_request_duration_seconds",
+        "HTTP request duration in seconds",
+        &["method", "path"]
+    ).unwrap()
+});
+
+async fn track_metrics(req: Request, next: Next) -> Response {
+    let method = req.method().to_string();
+    let path = req
+        .extensions()
+        .get::<MatchedPath>()
+        .map(|p| p.as_str().to_string())
+        .unwrap_or_else(|| "unknown".to_string());
+
+    if matches!(path.as_str(), "/health" | "/metrics") {
+        return next.run(req).await;
+    }
+
+    let start = Instant::now();
+    let response = next.run(req).await;
+    let elapsed = start.elapsed().as_secs_f64();
+    let status = response.status().as_u16().to_string();
+
+    HTTP_REQUESTS
+        .with_label_values(&[&method, &path, &status])
+        .inc();
+    HTTP_DURATION
+        .with_label_values(&[&method, &path])
+        .observe(elapsed);
+
+    response
+}
 
 #[derive(Serialize)]
 struct StatusResponse {
@@ -41,10 +81,6 @@ async fn main() {
         .unwrap_or("0.0.0.0".into())
         .parse()
         .unwrap();
-    let cors: CorsLayer = CorsLayer::new()
-        .allow_methods(Any)
-        .allow_headers(Any)
-        .allow_origin(Any);
     
     let middleware = ServiceBuilder::new()
         .layer(
@@ -52,7 +88,7 @@ async fn main() {
                 .make_span_with(DefaultMakeSpan::new().level(Level::INFO))
                 .on_response(DefaultOnResponse::new().level(Level::INFO))
         )
-        .layer(cors);
+        .layer(middleware::from_fn(track_metrics));
 
     fmt()
     .with_env_filter(EnvFilter::try_from_default_env()
@@ -100,7 +136,6 @@ async fn api_status() -> Json<StatusResponse> {
 }
 
 async fn root() -> String {
-    REQUEST_COUNTER.inc();
     let hostname = std::env::var("HOSTNAME").unwrap_or("unknown".into());
     format!("Hello from instance: {hostname}")
 }
