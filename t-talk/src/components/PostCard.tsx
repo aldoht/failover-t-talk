@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Heart,
   MessageCircle,
@@ -30,6 +30,12 @@ export default function PostCard({
 }: Props) {
   const [editing, setEditing] = useState(false);
   const [editedText, setEditedText] = useState(post.text);
+
+  useEffect(() => {
+    if (!editing) {
+      setEditedText(post.text);
+    }
+  }, [post.text, editing]);
 
   function handleFollow(e: React.MouseEvent) {
     e.stopPropagation();

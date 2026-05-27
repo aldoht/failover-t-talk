@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { User, AtSign, Mail, Lock, Eye, EyeOff, Loader2 } from "lucide-react";
 
-export default function Signup() {
+export default function Signup({ onSuccess }: { onSuccess?: () => void }) {
   const [name, setName] = useState("");
   const [tag, setTag] = useState("");
   const [email, setEmail] = useState("");
@@ -52,7 +52,7 @@ export default function Signup() {
         localStorage.setItem("user_name", name.trim());  // Ej: "Ana Ruiz"
       }
 
-     window.location.href = "/";
+     onSuccess();
 
     } catch (err: any) {
       console.error("Error en el registro:", err);
