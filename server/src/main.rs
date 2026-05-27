@@ -67,6 +67,7 @@ async fn main() {
         .route("/v1/auth/signup", post(auth::signup))
         .route("/v1/auth/login", post(auth::login))
         .route("/v1/users/me", delete(endpoints::users::delete_user))
+        .route("/v1/users/me", get(endpoints::users::me))
         .route("/v1/users/{tag}", get(endpoints::users::user_by_tag))
         .route("/v1/users/{tag}/following", get(endpoints::users::user_follows))
         .route("/v1/users/{tag}/followers", get(endpoints::users::user_followed_by))
